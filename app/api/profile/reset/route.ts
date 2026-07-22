@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
 
     const { error: profileError } = await supabase
       .from('lex_profiles')
-      .update({ total_xp: 0, streak: 0, longest_streak: 0, hearts: 5 })
+      .update({ total_xp: 0, hearts: 5 })
       .eq('id', user.id)
 
     if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 })
