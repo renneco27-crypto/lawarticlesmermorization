@@ -1948,7 +1948,7 @@ function speakFromFirstMistake() {
 async function api(path, options = {}) {
   const headers = { 'Content-Type': 'application/json' };
   if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
-  const res = await fetch(path, { ...options, headers: { ...headers, ...options.headers } });
+  const res = await fetch(path, { ...options, cache: 'no-cache', headers: { ...headers, ...options.headers } });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error || 'API error');
@@ -2750,6 +2750,7 @@ function openUpload() {
 
 function closeUpload() {
   document.getElementById('uploadOverlay').classList.add('hidden');
+  reloadArticles();
 }
 
 function switchUploadTab(tab, btn) {
@@ -2767,7 +2768,6 @@ function handleFile(input) {
   const reader = new FileReader();
   reader.onload = function(e) {
     parseCSV(e.target.result);
-    document.getElementById('csvPasteArea').value = e.target.result;
   };
   reader.readAsText(file);
   input.value = '';
@@ -2794,7 +2794,6 @@ function handleDrop(e) {
     const reader = new FileReader();
     reader.onload = function(ev) {
       parseCSV(ev.target.result);
-      document.getElementById('csvPasteArea').value = ev.target.result;
     };
     reader.readAsText(files[0]);
   } else {
@@ -3063,9 +3062,13 @@ async function reloadArticles() {
   try {
     const articlesData = await api('/api/articles', { headers: { Authorization: 'Bearer ' + authToken } });
     if (articlesData) {
+      const currentId = articles[curArticleIdx]?.id;
       articles = articlesData;
       renderSidebar();
-      if (articles.length > 0) selectArticleById(articles[0].id);
+      if (articles.length > 0) {
+        const idx = articles.findIndex(a => a.id === currentId);
+        selectArticleById(idx >= 0 ? articles[idx].id : articles[0].id);
+      }
     }
   } catch (e) {
     console.error('Reload failed:', e);
