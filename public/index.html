@@ -212,11 +212,6 @@
     font-family:'Inter',sans-serif;cursor:pointer;
   }
   .book-select:focus { outline:none;border-color:var(--green); }
-  .book-mgr-btn {
-    font-size:13px;padding:1px 5px;border:none;background:none;
-    color:var(--text-dim);cursor:pointer;border-radius:4px;line-height:1;
-  }
-  .book-mgr-btn:hover { background:var(--surface3);color:var(--text); }
   .art-item {
     display: flex;
     align-items: center;
@@ -1157,19 +1152,8 @@
     color: #fff;
     cursor: pointer;
   }
-  .book-mgr-modal { background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-lg);padding:24px;max-width:400px;width:90%;position:relative;z-index:1001;max-height:80vh;overflow-y:auto; }
-  .book-mgr-head { font-family:'Nunito',sans-serif;font-weight:900;font-size:15px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center; }
-  .book-mgr-row { display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border); }
-  .book-mgr-row:last-child { border-bottom:none; }
-  .book-mgr-row .name { flex:1;font-size:13px; }
-  .book-mgr-row .count { font-size:11px;color:var(--text-dim);margin-right:6px; }
-  .book-mgr-row button { font-size:12px;padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface3);color:var(--text);cursor:pointer; }
-  .book-mgr-row button:hover { background:var(--border); }
-  .book-mgr-row .del-btn { color:var(--red);border-color:var(--red); }
-  .book-mgr-row .del-btn:hover { background:var(--red);color:#fff; }
-  .book-mgr-add { display:flex;gap:6px;margin-top:12px; }
-  .book-mgr-add input { flex:1;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface3);color:var(--text); }
-  .book-mgr-add button { font-size:12px;padding:6px 14px; }
+  .upload-book-row { display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap; }
+  .upload-book-select { font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface3);color:var(--text);min-width:160px; }
   .overlay {
     position: fixed;
     inset: 0;
@@ -1240,10 +1224,9 @@
 
   <!-- SIDEBAR -->
   <div class="sidebar" id="sidebar">
-    <div class="sidebar-book-row">
-      <select class="book-select" id="bookSelect" onchange="switchBook(this.value)"></select>
-      <button class="book-mgr-btn" onclick="toggleBookMgr()" title="Manage books">⚙</button>
-    </div>
+      <div class="sidebar-book-row">
+        <select class="book-select" id="bookSelect" onchange="switchBook(this.value)"></select>
+      </div>
     <div class="sidebar-head" id="sidebarHead">Loading articles…</div>
     <div id="sidebarList"></div>
   </div>
@@ -1557,6 +1540,12 @@
     <div class="upload-body">
       <!-- CSV pane -->
       <div id="uploadPaneCsv" class="upload-pane">
+        <div class="upload-book-row">
+          <label class="field-label" style="margin-bottom:0;">Upload to book:</label>
+          <select class="upload-book-select" id="uploadBookSelect" onchange="currentBookId=this.value;renderBookSelect()"></select>
+          <div class="upload-book-actions" id="uploadBookActions"></div>
+          <button class="btn-sm" onclick="createBookFromUpload()" title="Create new book">+ New</button>
+        </div>
         <input type="file" id="csvFileInput" accept=".csv,.txt" style="display:none" onchange="handleFile(this)">
         <div class="drop-zone" id="dropZone"
           onclick="document.getElementById('csvFileInput').click()"
@@ -1584,7 +1573,7 @@
           <div class="field-row-inline">
             <div class="field-row">
               <label class="field-label">Book</label>
-              <input class="field-input" id="addBook" placeholder='e.g. "Book 1"'>
+              <select class="field-input" id="addBookSelect" onchange="currentBookId=this.value;renderBookSelect()"></select>
             </div>
             <div class="field-row">
               <label class="field-label">Article Number</label>
@@ -1612,11 +1601,19 @@
       </div>
       <!-- Manage pane -->
       <div id="uploadPaneManage" class="upload-pane hidden">
-        <div class="mgr-header">
-          <span class="mgr-count" id="mgrCount">Loading articles…</span>
-          <button class="btn-sm" onclick="loadManageArticles()">↻ Refresh</button>
+        <div class="mgr-section" style="margin-bottom:16px;">
+          <div class="mgr-header" style="margin-bottom:8px;">
+            <span style="font-weight:700;font-size:13px;">Books</span>
+          </div>
+          <div id="mgrBookList" style="max-height:150px;overflow-y:auto;"></div>
         </div>
-        <div class="mgr-list" id="mgrList"></div>
+        <div class="mgr-section">
+          <div class="mgr-header">
+            <span class="mgr-count" id="mgrCount">Loading articles…</span>
+            <button class="btn-sm" onclick="loadManageArticles()">↻ Refresh</button>
+          </div>
+          <div class="mgr-list" id="mgrList"></div>
+        </div>
         <div id="uploadMgrResult" class="upload-result" style="display:none"></div>
       </div>
     </div>
@@ -2961,6 +2958,8 @@ function openUpload() {
   clearForm();
   parsedArticles = [];
   editingArticleId = null;
+  renderUploadBookSelect();
+  renderAddBookSelect();
 }
 
 function closeUpload() {
@@ -3142,7 +3141,7 @@ async function confirmUpload() {
 
 // ─── Tab: Add / Edit ─────────────────────────
 function clearForm() {
-  document.getElementById('addBook').value = '';
+  document.getElementById('addBookSelect').value = currentBookId || '';
   document.getElementById('addChapter').value = '';
   document.getElementById('addNumber').value = '';
   document.getElementById('addTitle').value = '';
@@ -3153,7 +3152,7 @@ function clearForm() {
 }
 
 function fillForm(article) {
-  document.getElementById('addBook').value = article.book || '';
+  document.getElementById('addBookSelect').value = currentBookId || '';
   document.getElementById('addChapter').value = article.chapter || '';
   document.getElementById('addNumber').value = article.articleNumber || article.article_number || '';
   document.getElementById('addTitle').value = article.title || '';
@@ -3210,6 +3209,26 @@ async function loadManageArticles() {
   count.textContent = 'Loading…';
   list.innerHTML = '';
   document.getElementById('uploadMgrResult').style.display = 'none';
+
+  if (books.length === 0) await fetchBooks();
+  const bookList = document.getElementById('mgrBookList');
+  if (bookList) {
+    bookList.innerHTML = books.map(b => {
+      const artCount = articles.filter(a => a.bookId === b.id).length;
+      const isCurrent = b.id === currentBookId;
+      return '<div class="mgr-item" style="' + (isCurrent ? 'border-left:3px solid var(--orange);' : '') + '">' +
+        '<div class="mgr-info">' +
+        '<div class="mgr-title">' + escapeHtml(b.name) + '</div>' +
+        '<div class="mgr-sub">' + artCount + ' article(s)</div>' +
+        '</div>' +
+        '<div class="mgr-actions">' +
+        '<button class="btn-sm" onclick="renameBook(\'' + b.id + '\')">✏️</button>' +
+        '<button class="btn-danger" onclick="deleteBook(\'' + b.id + '\',\'' + escapeHtml(b.name).replace(/'/g, "\\'") + '\')">🗑️</button>' +
+        '</div>' +
+        '</div>';
+    }).join('');
+  }
+
   try {
     const data = await api('/api/articles', { headers: { Authorization: 'Bearer ' + authToken } });
     count.textContent = data.length + ' article(s)';
@@ -3312,49 +3331,29 @@ async function switchBook(bookId) {
   renderSidebar();
 }
 
-function toggleBookMgr() {
-  const modal = document.getElementById('bookMgrModal');
-  if (modal.classList.contains('hidden')) { openBookMgr(); } else { closeBookMgr(); }
+function renderUploadBookSelect() {
+  const sel = document.getElementById('uploadBookSelect');
+  if (!sel) return;
+  sel.innerHTML = books.map(b => '<option value="' + b.id + '"' + (b.id === currentBookId ? ' selected' : '') + '>' + escapeHtml(b.name) + '</option>').join('');
 }
 
-function openBookMgr() {
-  document.getElementById('bookMgrModal').classList.remove('hidden');
-  renderBookMgr();
+function renderAddBookSelect() {
+  const sel = document.getElementById('addBookSelect');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— Select book —</option>' +
+    books.map(b => '<option value="' + b.id + '"' + (b.id === currentBookId ? ' selected' : '') + '>' + escapeHtml(b.name) + '</option>').join('');
 }
 
-function closeBookMgr() {
-  document.getElementById('bookMgrModal').classList.add('hidden');
-}
-
-async function renderBookMgr() {
-  if (books.length === 0) await fetchBooks();
-  const list = document.getElementById('bookMgrList');
-  if (!list) return;
-  list.innerHTML = books.map(b => {
-    const count = articles.filter(a => a.bookId === b.id).length;
-    return '<div class="book-mgr-row">' +
-      '<span class="name">' + escapeHtml(b.name) + '</span>' +
-      '<span class="count">' + count + ' arts</span>' +
-      '<button onclick="renameBook(\'' + b.id + '\')">✏️</button>' +
-      '<button class="del-btn" onclick="deleteBook(\'' + b.id + '\',\'' + escapeHtml(b.name) + '\')">🗑️</button>' +
-    '</div>';
-  }).join('');
-}
-
-async function createBook() {
-  const input = document.getElementById('bookMgrNewName');
-  const name = input.value.trim();
-  if (!name) return;
+async function createBookFromUpload() {
+  const name = prompt('Enter a name for the new book:');
+  if (!name || !name.trim()) return;
   try {
-    const d = await api('/api/books', { method: 'POST', body: JSON.stringify({ name }), headers: { Authorization: 'Bearer ' + authToken } });
-    input.value = '';
+    const d = await api('/api/books', { method: 'POST', body: JSON.stringify({ name: name.trim() }), headers: { Authorization: 'Bearer ' + authToken } });
     await fetchBooks();
-    renderBookMgr();
-    if (!currentBookId && books.length > 0) {
-      currentBookId = books[0].id;
-      renderBookSelect();
-      await reloadArticles(currentBookId);
-    }
+    currentBookId = d.id;
+    renderBookSelect();
+    renderUploadBookSelect();
+    renderAddBookSelect();
   } catch(e) { console.error('Create book failed:', e); }
 }
 
@@ -3367,8 +3366,9 @@ async function renameBook(bookId) {
     await api('/api/books/' + bookId, { method: 'PATCH', body: JSON.stringify({ name: name.trim() }), headers: { Authorization: 'Bearer ' + authToken } });
     await fetchBooks();
     renderBookSelect();
-    renderBookMgr();
     renderSidebar();
+    if (document.getElementById('uploadBookSelect')) renderUploadBookSelect();
+    if (document.getElementById('addBookSelect')) renderAddBookSelect();
   } catch(e) { console.error('Rename book failed:', e); }
 }
 
@@ -3379,7 +3379,6 @@ async function deleteBook(bookId, name) {
     await fetchBooks();
     if (currentBookId === bookId) currentBookId = books.length > 0 ? books[0].id : null;
     renderBookSelect();
-    renderBookMgr();
     await reloadArticles(currentBookId);
   } catch(e) { console.error('Delete book failed:', e); }
 }
@@ -3406,21 +3405,6 @@ if (document.readyState === 'loading') {
   init();
 }
 </script>
-
-<!-- ── BOOK MANAGER MODAL ──────────────────────── -->
-<div id="bookMgrModal" class="overlay hidden" style="z-index:1000;display:flex;align-items:center;justify-content:center">
-  <div class="book-mgr-modal">
-    <div class="book-mgr-head">
-      <span>Manage Books</span>
-      <button onclick="closeBookMgr()" style="font-size:18px;border:none;background:none;cursor:pointer;color:var(--text-dim)">&times;</button>
-    </div>
-    <div id="bookMgrList"></div>
-    <div class="book-mgr-add">
-      <input id="bookMgrNewName" placeholder="New book name" onkeydown="if(event.key==='Enter')createBook()">
-      <button class="btn-primary" onclick="createBook()" style="padding:6px 14px;font-size:12px">Add</button>
-    </div>
-  </div>
-</div>
 
 <!-- ── ALL DONE MODAL ─────────────────────────────────── -->
 <div id="allDoneModal" class="overlay hidden" style="z-index:1000">
