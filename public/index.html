@@ -2557,6 +2557,18 @@ function tryReinterpretSpokenNumber(num) {
     if (!isNaN(t)) results.add(t);
   }
 
+  // Strategy 3: try first N digits x 100 + last 2 digits
+  // e.g. "19132" → 19*100+32 = 1932
+  if (d.length >= 4) {
+    var lastTwo = parseInt(d.slice(-2), 10);
+    if (!isNaN(lastTwo)) {
+      for (var p = 1; p <= d.length - 2; p++) {
+        var pref = parseInt(d.slice(0, p), 10);
+        if (!isNaN(pref)) results.add(pref * 100 + lastTwo);
+      }
+    }
+  }
+
   return Array.from(results);
 }
 
