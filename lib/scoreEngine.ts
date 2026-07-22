@@ -387,8 +387,8 @@ export async function phoneticMatch(spoken: string, target: string): Promise<boo
 
 /**
  * Compares the user's spoken transcript against the article tokens.
- * Uses a greedy forward-scan: for each spoken word, we walk forward through
- * the token list looking for a match within a window to allow for skip/stutter.
+ * Each target word is independently searched for in the full transcript,
+ * so a mistake in one position doesn't prevent later words from matching.
  *
  * Numbers are normalized to words before matching.
  * FUNCTION_WORDs that were skipped are forgiven (not counted as wrong).
@@ -412,36 +412,26 @@ export async function scoreAttempt(
     status: currentStates?.[i] === 'correct' ? 'correct' : ('pending' as WordStatus),
   }))
 
-  const WINDOW = 5
+  // Track which spoken words have been consumed
+  const used = new Array(spokenWords.length).fill(false)
 
-  // Pass 1: sequential cursor scan
-  // Each spoken word looks ahead WINDOW tokens from cursor; if matched, mark correct and advance.
-  // If none match, the spoken word is simply a miss — do NOT consume or advance the cursor.
-  // This prevents premature wrong-marking and allows subsequent correct words to still match.
-  let cursor = target.findIndex((_, i) => scoredWords[i].status === 'pending')
-  if (cursor < 0) cursor = 0
-
-  for (const spokenWord of spokenWords) {
-    if (cursor >= target.length) break
-    let matchIdx = -1
-    for (let look = 0; look < WINDOW && cursor + look < target.length; look++) {
-      const idx = cursor + look
-      if (scoredWords[idx].status !== 'pending') continue
-      const token = target[idx]
-      const normalizedToken = normalizeNumbers(token.word)
-      const targetNorm = normalizeWord(normalizedToken)
-      const isMatch = await phoneticMatch(spokenWord, targetNorm)
+  // Pass 1: independent per-target-word matching
+  // For each pending target word, scan ALL unused spoken words for a match.
+  // This guarantees a mistake in the middle doesn't prevent later correct words from being found.
+  for (let i = 0; i < scoredWords.length; i++) {
+    if (scoredWords[i].status !== 'pending') continue
+    const token = target[i]
+    const targetNorm = normalizeWord(normalizeNumbers(token.word))
+    for (let j = 0; j < spokenWords.length; j++) {
+      if (used[j]) continue
+      const isMatch = await phoneticMatch(spokenWords[j], targetNorm)
       if (isMatch) {
-        matchIdx = idx
+        scoredWords[i].status = 'correct'
+        scoredWords[i].spokenAs = spokenWords[j]
+        used[j] = true
         break
       }
     }
-    if (matchIdx >= 0) {
-      scoredWords[matchIdx].status = 'correct'
-      scoredWords[matchIdx].spokenAs = spokenWord
-      cursor = matchIdx + 1
-    }
-    // No match: spoken word is a miss — cursor stays, next spoken word still gets a fair shot
   }
 
   // Pass 2: anything still pending after all spoken words are consumed gets marked.

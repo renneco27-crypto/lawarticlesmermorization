@@ -1200,6 +1200,9 @@
   <button class="upload-btn-top" onclick="openUpload()">
     <i class="ti ti-file-upload"></i> CSV
   </button>
+  <button class="upload-btn-top" onclick="resetAllProgress()" title="Reset all progress and start fresh" style="color:var(--red)">
+    <i class="ti ti-refresh"></i> Start Again
+  </button>
   <button class="upload-btn-top" onclick="logout()" title="Sign out">
     <i class="ti ti-logout"></i>
   </button>
@@ -1633,6 +1636,11 @@ const COACH_MSGS = {
 
 // Coach speech message pools for context-aware TTS
 const COACH_SPEECH_POOLS = {
+  startFresh: [
+    "Fresh start! Let's build that recall from the ground up, counsel!",
+    "Clean slate! Time to lock in those provisions like never before!",
+    "Tabula rasa! Every master was once a beginner. Let's go!",
+  ],
   sessionStart: [
     "Alright, counsel, time to put on the suit and lock in. Let's crush this session!",
     "Standard of review today? Flawless. Let's get to work!",
@@ -1749,6 +1757,36 @@ function restartAll() {
   if (articles.length > 0) selectArticle(modeArticleOrder[0] ?? 0);
   resetTranscript();
 }
+
+async function resetAllProgress() {
+  if (!confirm('Reset all progress? Your XP, streak, hearts, and article scores will be cleared.')) return;
+  try {
+    await api('/api/profile/reset', { method: 'POST', headers: { Authorization: 'Bearer ' + authToken } });
+  } catch (e) { console.error('Reset backend failed:', e); }
+  localStorage.removeItem('lex_progress');
+  progressData = {};
+  dismissedWeakSpots = new Set();
+  xp = 0;
+  streak = 0;
+  hearts = 5;
+  articlesCompleted = 0;
+  consecutivePerfect = 0;
+  wordStates = [];
+  updateStatsUI();
+  const doneCount = Math.min(3, tokens.length);
+  document.getElementById('progressText').textContent = doneCount + ' / ' + tokens.length + ' words';
+  if (mode === 'weakspots') {
+    mode = 'linear';
+    document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.textContent.trim() === 'Linear'));
+  }
+  applyMode();
+  speakCoachMessage('startFresh');
+  document.getElementById('transcript').textContent = 'Hold spacebar or click mic to recite';
+  document.getElementById('transcript').classList.remove('live');
+  document.getElementById('scoreBadge').textContent = '';
+  document.getElementById('scoreBadge').className = 'score-badge';
+}
+
 
 function checkAllComplete() {
   const total = (modeArticleOrder.length > 0 ? modeArticleOrder : articles.map((_, i) => i)).length;
