@@ -1667,6 +1667,7 @@ let recognitionRestartTimer = null;
 let silenceTimer = null;
 let editingArticleId = null;
 let parsedArticles = [];
+var totalArticleCount = 0;
 
 // Bind login form events early so they work even if something below crashes
 document.addEventListener('DOMContentLoaded', function() {
@@ -1852,7 +1853,7 @@ async function resetAllProgress() {
 
 
 function checkAllComplete() {
-  const total = (modeArticleOrder.length > 0 ? modeArticleOrder : articles.map((_, i) => i)).length;
+  var total = totalArticleCount;
   if (articlesCompleted >= total && total > 0) {
     launchConfetti();
     speakCoachMessage('sessionEnd');
@@ -2160,6 +2161,8 @@ async function initApp() {
       renderBookSelect();
       await reloadArticles(currentBookId);
     }
+    // Fetch total article count across all books (for all-done check)
+    try { var allArticles = await api('/api/articles', { headers: { Authorization: 'Bearer ' + authToken } }); totalArticleCount = allArticles ? allArticles.length : 0; } catch(e) {}
 
     updateStatsUI();
     mode = 'linear';
@@ -2960,7 +2963,8 @@ function updateScore(score) {
   if (pct === 100) {
     speakCoachMessage('sessionEnd');
     if (curDiff === 1) {
-      // Full → stay on same article, switch to A__
+      // Full → stay on same article, switch to A__, reset word states
+      wordStates = tokens.map(function(){return 'pending'});
       setDiff(document.querySelector('.diff-pills .diff-pill:nth-child(2)'), 2);
     } else if (curDiff === 2) {
       // A__ → switch to Full, then advance to next article
