@@ -2419,10 +2419,10 @@ function setupSpeechRecognition() {
 }
 
 function startListening() {
-  if (!recognition) setupSpeechRecognition();
+  if (!recognition) { setupSpeechRecognition(); if (!recognition) return; }
   isListening = true;
   recognitionActive = true;
-  try { recognition.start(); } catch(e) {}
+  try { recognition.start(); } catch(e) { setupSpeechRecognition(); try { recognition.start(); } catch(e2) {} }
   document.getElementById('micBtn').className = 'mic-btn listening';
   document.getElementById('micBtn').querySelector('i').className = 'ti ti-microphone';
   document.getElementById('transcript').textContent = 'Listening…';
@@ -2435,7 +2435,6 @@ function stopListening() {
   if (recognitionRestartTimer) clearTimeout(recognitionRestartTimer);
   if (silenceTimer) clearTimeout(silenceTimer);
   try { recognition.abort(); } catch(e) {}
-  recognition = null;
   document.getElementById('micBtn').className = 'mic-btn stopped';
   document.getElementById('micBtn').querySelector('i').className = 'ti ti-microphone-off';
   var transcriptToSubmit = finalTranscript.trim() || interimTranscript.trim();
@@ -2454,14 +2453,15 @@ function resetTranscript() {
 
 function onKeyDown(e) {
   if (e.key === ' ' || e.code === 'Space') {
-    e.preventDefault();
     if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
+    e.preventDefault();
     startPushToTalk();
   }
 }
 
 function onKeyUp(e) {
   if (e.key === ' ' || e.code === 'Space') {
+    if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
     e.preventDefault();
     stopPushToTalk();
   }
