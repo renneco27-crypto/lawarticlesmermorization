@@ -480,6 +480,18 @@
   .word-area input.word:focus {
     border-color: var(--blue);
   }
+  .word-area input.word.correct {
+    color: #0a3a1a;
+    background: var(--green-bg);
+    border-color: var(--green);
+    animation: stamp 0.25s ease-out;
+  }
+  .word-area input.word.wrong {
+    color: #5a0000;
+    background: var(--red-bg);
+    border-color: var(--red);
+    animation: wobble 0.3s ease-out;
+  }
   @keyframes stamp {
     0% { transform: scale(1.15); }
     100% { transform: scale(1); }
@@ -3239,10 +3251,10 @@ function renderWords() {
       if (isFunc) {
         return `<span class="word func-word" id="word-${i}">${display}</span>`;
       }
-      return `<input class="word pending" id="word-${i}" type="text" value="${display}" data-word="${t.word}" autocomplete="off" spellcheck="false" onfocus="this.select()" onblur="checkWordInput(${i})" onkeydown="if(event.key==='Enter')this.blur()">`;
+      return `<input class="word pending" id="word-${i}" type="text" value="${display}" size="${t.word.length}" data-word="${t.word}" autocomplete="off" spellcheck="false" onfocus="this.select()" oninput="checkWordInput(${i})" onkeydown="if(event.key==='Enter')this.blur()">`;
     } else if (curDiff === 3) {
       display = '_'.repeat(Math.max(t.word.length, 1));
-      return `<input class="word pending" id="word-${i}" type="text" value="${display}" data-word="${t.word}" autocomplete="off" spellcheck="false" onfocus="this.select()" onblur="checkWordInput(${i})" onkeydown="if(event.key==='Enter')this.blur()">`;
+      return `<input class="word pending" id="word-${i}" type="text" value="${display}" size="${t.word.length}" data-word="${t.word}" autocomplete="off" spellcheck="false" onfocus="this.select()" oninput="checkWordInput(${i})" onkeydown="if(event.key==='Enter')this.blur()">`;
     }
     const cls = t.wordType === 'FUNCTION_WORD' ? 'word func-word' : 'word pending';
     return `<span class="${cls}" id="word-${i}" onclick="clickWord(${i})">${display}</span>`;
@@ -3269,6 +3281,17 @@ function checkWordInput(i) {
   wordStates[i] = inputVal === target ? 'correct' : 'wrong';
   el.className = 'word ' + wordStates[i];
   updateOverallScore();
+  if (wordStates[i] === 'correct') {
+    for (let j = i + 1; j < tokens.length; j++) {
+      if (curDiff === 2 && tokens[j].wordType === 'FUNCTION_WORD') continue;
+      const next = document.getElementById('word-' + j);
+      if (next && next.tagName === 'INPUT') {
+        next.focus();
+        next.select();
+        break;
+      }
+    }
+  }
 }
 
 function updateOverallScore() {
