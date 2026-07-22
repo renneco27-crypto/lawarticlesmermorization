@@ -1200,9 +1200,6 @@
   <button class="upload-btn-top" onclick="openUpload()">
     <i class="ti ti-file-upload"></i> CSV
   </button>
-  <button class="upload-btn-top" onclick="resetAllProgress()" title="Reset all progress and start fresh" style="color:var(--red)">
-    <i class="ti ti-refresh"></i> Start Again
-  </button>
   <button class="upload-btn-top" onclick="logout()" title="Sign out">
     <i class="ti ti-logout"></i>
   </button>
@@ -2370,8 +2367,9 @@ function stopListening() {
   if (finalTranscript.trim() && tokens.length > 0) {
     submitScore(finalTranscript.trim());
   }
-  // Only reset transcript on manual stop
   resetTranscript();
+  document.getElementById('transcript').textContent = 'Hold spacebar or click mic to recite';
+  document.getElementById('transcript').classList.remove('live');
 }
 
 function resetTranscript() {
@@ -2437,7 +2435,55 @@ function sameOnsetAndClass(wa,wb){var a=normalizeWord(wa),b=normalizeWord(wb); i
 
 async function phoneticMatch(spoken,target){var a=stripDiacritics(spoken.toLowerCase().trim()),b=stripDiacritics(target.toLowerCase().trim()); if(a===b)return true; if(inSameHomophoneGroup(a,b))return true; if(levenshteinDistance(a,b)<=1)return true; var skA=consonantSkeleton(a),skB=consonantSkeleton(b); if(skA===skB)return true; if(Math.abs(skA.length-skB.length)<=1&&rhymeTail(a)===rhymeTail(b)&&countSyllables(a)===countSyllables(b))return true; if(sameOnsetAndClass(a,b))return true; return false }
 
-async function scoreAttempt(spoken,target,currentStates){var normalizedSpoken=normalizeNumbers(spoken); var spokenWords=normalizedSpoken.trim().split(/\s+/).map(function(w){return normalizeWord(w)}).filter(Boolean); var scoredWords=target.map(function(token,i){return{word:token.word,wordType:token.wordType,status:(currentStates&&currentStates[i]==='correct')?'correct':'pending',spokenAs:null}}); var used=new Array(spokenWords.length).fill(false); for(var i=0;i<scoredWords.length;i++){if(scoredWords[i].status!=='pending')continue; var targetNorm=normalizeWord(normalizeNumbers(target[i].word)); for(var j=0;j<spokenWords.length;j++){if(used[j])continue; var isMatch=await phoneticMatch(spokenWords[j],targetNorm); if(isMatch){scoredWords[i].status='correct';scoredWords[i].spokenAs=spokenWords[j];used[j]=true;break}}} for(var i=0;i<scoredWords.length;i++){if(scoredWords[i].status==='pending'){scoredWords[i].status=target[i].wordType==='FUNCTION_WORD'?'correct':'wrong'}} var nonFuncWords=target.filter(function(t){return t.wordType!=='FUNCTION_WORD'}); var correctWords=scoredWords.filter(function(w,i){return w.status==='correct'&&target[i].wordType!=='FUNCTION_WORD'}).length; var totalWords=target.length; var percentCorrect=nonFuncWords.length>0?Math.round(correctWords/nonFuncWords.length*100):100; return{totalWords:totalWords,correctWords:correctWords,percentCorrect:percentCorrect,scoredWords:scoredWords} }
+async function scoreAttempt(spoken,target,currentStates){
+  var normalizedSpoken=normalizeNumbers(spoken);
+  var spokenWords=normalizedSpoken.trim().split(/\s+/).map(function(w){return normalizeWord(w)}).filter(Boolean);
+  var scoredWords=target.map(function(token,i){return{word:token.word,wordType:token.wordType,status:(currentStates&&currentStates[i]==='correct')?'correct':'pending',spokenAs:null}});
+  var used=new Array(spokenWords.length).fill(false);
+
+  // ORDER-PRESERVING match: each keyword must appear AFTER the previous keyword's match position.
+  // This prevents "days 15" from satisfying "15 days" and vice versa.
+  // We track lastMatchedJ (the spoken-word index of the most recent keyword match).
+  // Function words are auto-correct and do NOT advance the cursor, so order is enforced
+  // only across content keywords.
+  var lastKeywordMatchJ = -1;
+
+  for(var i=0;i<scoredWords.length;i++){
+    if(scoredWords[i].status!=='correct'){scoredWords[i].status='pending';}
+    if(scoredWords[i].status!=='pending') continue;
+
+    var isFunc = target[i].wordType==='FUNCTION_WORD';
+    var targetNorm=normalizeWord(normalizeNumbers(target[i].word));
+
+    if(isFunc){
+      // Function words: accept freely (don't enforce order, don't advance cursor)
+      scoredWords[i].status='correct';
+      continue;
+    }
+
+    // Keyword: must be found strictly AFTER lastKeywordMatchJ
+    var found=false;
+    for(var j=lastKeywordMatchJ+1;j<spokenWords.length;j++){
+      if(used[j]) continue;
+      var isMatch=await phoneticMatch(spokenWords[j],targetNorm);
+      if(isMatch){
+        scoredWords[i].status='correct';
+        scoredWords[i].spokenAs=spokenWords[j];
+        used[j]=true;
+        lastKeywordMatchJ=j;
+        found=true;
+        break;
+      }
+    }
+    if(!found){ scoredWords[i].status='wrong'; }
+  }
+
+  var nonFuncWords=target.filter(function(t){return t.wordType!=='FUNCTION_WORD'});
+  var correctWords=scoredWords.filter(function(w,i){return w.status==='correct'&&target[i].wordType!=='FUNCTION_WORD'}).length;
+  var totalWords=target.length;
+  var percentCorrect=nonFuncWords.length>0?Math.round(correctWords/nonFuncWords.length*100):100;
+  return{totalWords:totalWords,correctWords:correctWords,percentCorrect:percentCorrect,scoredWords:scoredWords}
+}
 
 // ─── Scoring ──────────────────────────────────────────────────
 async function submitScore(transcript) {
@@ -3214,7 +3260,7 @@ if (document.readyState === 'loading') {
     <div style="font-size:14px;color:var(--text-dim);margin-bottom:24px;line-height:1.6">
       Every article mastered.<br>Case closed, counsel. Outstanding work.
     </div>
-    <button onclick="restartAll()" style="
+    <button onclick="resetAllProgress()" style="
       font-family:'Nunito',sans-serif;font-weight:900;font-size:15px;
       padding:12px 32px;border-radius:99px;border:none;
       background:var(--green);color:#fff;cursor:pointer;
