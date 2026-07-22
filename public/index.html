@@ -1608,6 +1608,7 @@ let dismissedWeakSpots = new Set();
 let hintsOn = true;
 let showWordsInHints = false;
 let wordStates = [];
+let lastScoredPct = 0; // tracks the score from the previous attempt to gate XP
 let tokens = [];
 let xp = 0;
 let streak = 0;
@@ -2187,6 +2188,7 @@ function selectArticle(idx) {
   // Don't stop listening — let mic keep running for the new article
   // Just reset transcript and word states
   resetTranscript();
+  lastScoredPct = 0;
   wordStates = tokens.map(() => 'pending');
 
   document.querySelectorAll('.art-item').forEach((el, i) => {
@@ -2396,7 +2398,11 @@ function updateScore(score) {
     speakCoachMessage('stumble');
   }
 
-  const earned = Math.floor(pct / 10) * 2;
+  // Only award XP for improvement over the previous attempt on this article
+  const prevTier = Math.floor(lastScoredPct / 10);
+  const newTier  = Math.floor(pct / 10);
+  const earned   = Math.max(0, (newTier - prevTier) * 2);
+  lastScoredPct  = Math.max(lastScoredPct, pct);
   if (earned > 0) {
     xp += earned;
     document.getElementById('xpCount').textContent = xp.toLocaleString();

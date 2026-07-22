@@ -415,8 +415,9 @@ export async function scoreAttempt(
   const WINDOW = 5
 
   // Pass 1: sequential cursor scan
-  // Each spoken word looks ahead WINDOW tokens from cursor; if matched, advance past it.
-  // If none match, mark first pending token at cursor as wrong and advance past it.
+  // Each spoken word looks ahead WINDOW tokens from cursor; if matched, mark correct and advance.
+  // If none match, the spoken word is simply a miss — do NOT consume or advance the cursor.
+  // This prevents premature wrong-marking and allows subsequent correct words to still match.
   let cursor = target.findIndex((_, i) => scoredWords[i].status === 'pending')
   if (cursor < 0) cursor = 0
 
@@ -439,17 +440,16 @@ export async function scoreAttempt(
       scoredWords[matchIdx].status = 'correct'
       scoredWords[matchIdx].spokenAs = spokenWord
       cursor = matchIdx + 1
-    } else {
-      // Mark first pending token at cursor as wrong and advance
-      const firstPending = target.findIndex((_, i) => i >= cursor && scoredWords[i].status === 'pending')
-      if (firstPending >= 0) {
-        if (scoredWords[firstPending].wordType !== 'FUNCTION_WORD') {
-          scoredWords[firstPending].status = 'wrong'
-        } else {
-          scoredWords[firstPending].status = 'correct'
-        }
-        cursor = firstPending + 1
-      }
+    }
+    // No match: spoken word is a miss — cursor stays, next spoken word still gets a fair shot
+  }
+
+  // Pass 2: anything still pending after all spoken words are consumed gets marked.
+  // Function words that were skipped over are forgiven (correct); content words are wrong.
+  for (let i = 0; i < scoredWords.length; i++) {
+    if (scoredWords[i].status === 'pending') {
+      scoredWords[i].status =
+        target[i].wordType === 'FUNCTION_WORD' ? 'correct' : 'wrong'
     }
   }
 
