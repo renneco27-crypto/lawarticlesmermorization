@@ -1771,20 +1771,31 @@ async function resetAllProgress() {
   hearts = 5;
   articlesCompleted = 0;
   consecutivePerfect = 0;
-  wordStates = [];
+  for (let i = 0; i < articles.length; i++) {
+    const art = articles[i];
+    const key = `lex_ws_${art.id}`;
+    try { localStorage.removeItem(key); } catch {}
+    try { localStorage.removeItem(`lex_progress_${art.id}`); } catch {}
+  }
   updateStatsUI();
+  wordStates = tokens.map(() => 'pending');
+  tokens.forEach((_, i) => updateWordEl(i));
+  document.getElementById('transcript').textContent = 'Hold spacebar or click mic to recite';
+  document.getElementById('transcript').classList.remove('live');
+  document.getElementById('scoreBadge').textContent = '';
+  document.getElementById('scoreBadge').className = 'score-badge';
+  document.getElementById('progressFill').style.width = '0%';
   const doneCount = Math.min(3, tokens.length);
   document.getElementById('progressText').textContent = doneCount + ' / ' + tokens.length + ' words';
+  setCoachMood('idle');
+  renderCoach();
+  resetTranscript();
   if (mode === 'weakspots') {
     mode = 'linear';
     document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.textContent.trim() === 'Linear'));
   }
   applyMode();
   speakCoachMessage('startFresh');
-  document.getElementById('transcript').textContent = 'Hold spacebar or click mic to recite';
-  document.getElementById('transcript').classList.remove('live');
-  document.getElementById('scoreBadge').textContent = '';
-  document.getElementById('scoreBadge').className = 'score-badge';
 }
 
 
