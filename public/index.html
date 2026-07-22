@@ -462,6 +462,24 @@
     border-color: transparent;
     font-size: 13px;
   }
+  .word-area input.word {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 500;
+    display: inline-block;
+    padding: 3px 8px;
+    margin: 2px 2px;
+    border-radius: var(--radius-sm);
+    border: 2px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    outline: none;
+    width: auto;
+    min-width: 30px;
+  }
+  .word-area input.word:focus {
+    border-color: var(--blue);
+  }
   @keyframes stamp {
     0% { transform: scale(1.15); }
     100% { transform: scale(1); }
@@ -3218,8 +3236,13 @@ function renderWords() {
     if (curDiff === 2) {
       const isFunc = t.wordType === 'FUNCTION_WORD';
       display = isFunc ? t.raw : (t.word[0] ? t.word[0].toUpperCase() + '_'.repeat(t.word.length - 1) : t.raw);
+      if (isFunc) {
+        return `<span class="word func-word" id="word-${i}">${display}</span>`;
+      }
+      return `<input class="word pending" id="word-${i}" type="text" value="${display}" data-word="${t.word}" autocomplete="off" spellcheck="false" onfocus="this.select()" onblur="checkWordInput(${i})" onkeydown="if(event.key==='Enter')this.blur()">`;
     } else if (curDiff === 3) {
       display = '_'.repeat(Math.max(t.word.length, 1));
+      return `<input class="word pending" id="word-${i}" type="text" value="${display}" data-word="${t.word}" autocomplete="off" spellcheck="false" onfocus="this.select()" onblur="checkWordInput(${i})" onkeydown="if(event.key==='Enter')this.blur()">`;
     }
     const cls = t.wordType === 'FUNCTION_WORD' ? 'word func-word' : 'word pending';
     return `<span class="${cls}" id="word-${i}" onclick="clickWord(${i})">${display}</span>`;
@@ -3233,6 +3256,22 @@ function clickWord(i) {
   const cur = states.indexOf(wordStates[i]);
   wordStates[i] = states[(cur + 1) % states.length];
   updateWordEl(i);
+  updateOverallScore();
+}
+
+function checkWordInput(i) {
+  if (curDiff !== 2 && curDiff !== 3) return;
+  const el = document.getElementById('word-' + i);
+  if (!el) return;
+  if (curDiff === 2 && tokens[i].wordType === 'FUNCTION_WORD') return;
+  const inputVal = el.value.trim().toLowerCase();
+  const target = tokens[i].word.toLowerCase();
+  wordStates[i] = inputVal === target ? 'correct' : 'wrong';
+  el.className = 'word ' + wordStates[i];
+  updateOverallScore();
+}
+
+function updateOverallScore() {
   const nonFunc = tokens.filter(t => t.wordType !== 'FUNCTION_WORD');
   const correct = nonFunc.filter((_, idx) => wordStates[tokens.indexOf(nonFunc[idx])] === 'correct').length;
   const total = nonFunc.length;
