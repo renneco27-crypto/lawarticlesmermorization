@@ -3640,9 +3640,9 @@ function renderBookSelect() {
 async function switchBook(bookId) {
   if (bookId === currentBookId) return;
   currentBookId = bookId;
+  modeArticleOrder = [];
   renderBookSelect();
   await reloadArticles(currentBookId);
-  renderSidebar();
 }
 
 function renderUploadBookSelect() {
