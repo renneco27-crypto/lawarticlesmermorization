@@ -2208,6 +2208,7 @@ function renderSidebar() {
   const head = document.getElementById('sidebarHead');
   if (articles.length === 0) {
     head.textContent = 'No articles';
+    list.innerHTML = '';
     return;
   }
 
@@ -2950,7 +2951,7 @@ function updateScore(score) {
       // A__ → switch to Full, then advance to next article
       setDiff(document.querySelector('.diff-pills .diff-pill:nth-child(1)'), 1);
       setTimeout(() => {
-        const order = modeArticleOrder.length > 0 ? modeArticleOrder : articles.map((_, i) => i);
+  const order = (modeArticleOrder.length > 0 ? modeArticleOrder : articles.map((_, i) => i)).filter(function(idx){return idx < articles.length});
         const curPos = order.indexOf(curArticleIdx);
         if (curPos >= 0 && curPos < order.length - 1) {
           selectArticle(order[curPos + 1]);
@@ -3627,7 +3628,7 @@ async function reloadArticles(bookId) {
 
 // ─── Book Management ──────────────────────────────────
 async function fetchBooks() {
-  try { const d = await api('/api/books'); books = d || []; } catch(e) { console.error('Fetch books failed:', e); }
+  try { const d = await api('/api/books'); books = (d || []).sort(function(a,b){return a.name.localeCompare(b.name)}); } catch(e) { console.error('Fetch books failed:', e); }
 }
 
 function renderBookSelect() {
