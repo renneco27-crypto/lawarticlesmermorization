@@ -1565,11 +1565,11 @@
           ondrop="handleDrop(event)">
           <div class="drop-zone-icon"><i class="ti ti-file-spreadsheet"></i></div>
           <div class="drop-zone-text">Drop a .csv or .txt file here, or click to browse</div>
-          <div class="drop-zone-sub">Expected columns: book, chapter, article_number, title, content_md</div>
+          <div class="drop-zone-sub">Expected columns: chapter, article_number, title, content_md</div>
         </div>
         <div class="upload-preview" id="uploadPreview" style="display:none">
           <table>
-            <thead><tr><th>#</th><th>Art.</th><th>Title</th><th>Book / Chapter</th></tr></thead>
+            <thead><tr><th>#</th><th>Art.</th><th>Title</th><th>Chapter</th></tr></thead>
             <tbody id="previewBody"></tbody>
           </table>
         </div>
@@ -3035,7 +3035,7 @@ function parseCSV(text) {
   const header = parseCSVLine(lines[0]);
   const colMap = {};
   header.forEach((h, i) => colMap[h.toLowerCase().trim()] = i);
-  const required = ['book', 'chapter', 'article_number', 'title', 'content_md'];
+  const required = ['chapter', 'article_number', 'title', 'content_md'];
   const missing = required.filter(r => !(r in colMap));
   if (missing.length > 0) {
     showCsvResult('Missing columns: ' + missing.join(', ') + '. Required: ' + required.join(', '), false);
@@ -3047,7 +3047,6 @@ function parseCSV(text) {
     const get = (col) => (vals[colMap[col]] || '').trim();
     const artNum = parseInt(get('article_number'), 10);
     rows.push({
-      book: get('book'),
       chapter: get('chapter'),
       article_number: isNaN(artNum) ? 0 : artNum,
       title: get('title'),
@@ -3098,7 +3097,7 @@ function renderPreview(rows) {
       <td class="num">${i + 1}</td>
       <td class="num">${r.article_number}</td>
       <td>${escapeHtml(r.title)}</td>
-      <td>${escapeHtml(r.book)} / ${escapeHtml(r.chapter)}</td>
+      <td>${escapeHtml(r.chapter)}</td>
     </tr>`
   ).join('');
   if (valid.length > 50) {
