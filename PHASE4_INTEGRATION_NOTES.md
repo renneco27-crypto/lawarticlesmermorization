@@ -1,0 +1,109 @@
+# Phase 4 Integration Notes
+
+## Files delivered
+
+```
+lib/ttsService.ts
+lib/dictionaryService.ts
+lib/coachEngine.ts
+hooks/useTTS.ts
+app/api/define/route.ts
+app/api/hint/route.ts
+components/CoachPanel.tsx
+components/SpellChallenge.tsx
+components/TypeItChallenge.tsx
+components/CoachToggle.tsx
+```
+
+## Required change to Phase 1 file: `lib/cacheManager.ts`
+
+Add `DEFINE` and `PHONETIC` to `CACHE_KEYS`:
+
+```typescript
+export const CACHE_KEYS = {
+  ALL_ARTICLES:    'articles:all',
+  BOOK:            (book: string) => `articles:book:${book}`,
+  ARTICLE:         (id: string)   => `article:${id}`,
+  PROGRESS:        (userId: string) => `progress:${userId}`,
+  CURRENT_SESSION: 'session:current',
+  // ← Add these two for Phase 4:
+  DEFINE:          (word: string) => `define:${word}`,
+  PHONETIC:        (word: string) => `phonetic:${word}`,
+} as const
+```
+
+## Wiring CoachPanel into ArticlePlayer (Phase 5 task)
+
+In `app/practice/[articleId]/page.tsx` or `ArticlePlayer.tsx`:
+
+```tsx
+import { CoachPanel } from '@/components/CoachPanel'
+import { useTTS } from '@/hooks/useTTS'
+import { generateHint } from '@/lib/coachEngine'
+import { useState } from 'react'
+import type { Hint } from '@/types'
+
+// Inside your component:
+const { speak, stop, isSpeaking } = useTTS()
+const [hint, setHint] = useState<Hint | null>(null)
+const [coachEnabled, setCoachEnabled] = useState(true)
+const [wordAttempts, setWordAttempts] = useState<Record<string, number>>({})
+
+// Call this when scoreEngine finds red words:
+async function handleMissedWord(token: WordToken) {
+  const attempts = (wordAttempts[token.word] ?? 0) + 1
+  setWordAttempts(prev => ({ ...prev, [token.word]: attempts }))
+
+  const newHint = await generateHint(token, attempts)
+  setHint(newHint)
+
+  if (coachEnabled && newHint.type !== 'skip' && newHint.text) {
+    speak(newHint.text)
+  }
+}
+
+// Build TypeItChallenge context from article tokens:
+// Replace the missed word's position with "___" in the sentence
+function buildContext(tokens: WordToken[], missedIndex: number): string {
+  return tokens
+    .map((t, i) => (i === missedIndex ? '___' : t.raw))
+    .join(' ')
+}
+
+// In JSX:
+<CoachPanel
+  hint={hint}
+  isEnabled={coachEnabled}
+  onToggleEnabled={(v) => { setCoachEnabled(v); if (!v) stop() }}
+  onSpellSubmit={(spelled) => {
+    // Compare spelled to hint.targetWord, give feedback
+    setHint(null)
+  }}
+  onTypeItSubmit={(typed) => {
+    // Compare typed to hint.targetWord, give feedback
+    setHint(null)
+  }}
+  isSpeaking={isSpeaking}
+/>
+```
+
+## Hint API usage from client
+
+If you want the Mistral hint from the client instead of coachEngine directly:
+
+```typescript
+const res = await fetch('/api/hint', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ word, context, hintType: 'definition' }),
+})
+const { hint } = await res.json()
+```
+
+## Environment variables needed
+
+```bash
+MISTRAL_API_KEY=...          # server-side only (no NEXT_PUBLIC_ prefix)
+NEXT_PUBLIC_TTS_RATE=0.9     # optional
+NEXT_PUBLIC_TTS_VOICE=...    # optional, e.g. "Microsoft Zira Desktop"
+```

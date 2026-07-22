@@ -1,0 +1,2825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lex Memoria — Gamified</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --green:      #58cc02;
+    --green-dark: #4aaa02;
+    --green-bg:   #d7ffb8;
+    --blue:       #1cb0f6;
+    --blue-bg:    #ddf4ff;
+    --red:        #ff4b4b;
+    --red-bg:     #ffdfe0;
+    --orange:     #ff9600;
+    --orange-bg:  #feefe3;
+    --purple:     #ce82ff;
+    --purple-bg:  #f0d9ff;
+    --gold:       #ffc800;
+    --bg:         #131f24;
+    --surface:    #1c2d35;
+    --surface2:   #243540;
+    --surface3:   #2e4250;
+    --border:     #2e4250;
+    --text:       #e8f4f0;
+    --text-dim:   #8ba7b2;
+    --text-muted: #526b78;
+    --radius-sm:  8px;
+    --radius:     12px;
+    --radius-lg:  18px;
+    --radius-xl:  24px;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+  }
+
+  /* ── TOPBAR ───────────────────────────────────── */
+  /* ── LOGIN OVERLAY ─────────────────────────── */
+  .login-overlay {
+    position: fixed; inset: 0; z-index: 999;
+    background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .login-overlay.hidden { display: none; }
+  .login-card {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-xl);
+    padding: 36px 32px;
+    width: 90%; max-width: 380px;
+    text-align: center;
+  }
+  .login-logo {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    font-size: 28px;
+    color: var(--green);
+    margin-bottom: 4px;
+  }
+  .login-logo span { color: var(--text); }
+  .login-sub {
+    font-size: 13px; color: var(--text-muted);
+    margin-bottom: 24px;
+  }
+  .login-field {
+    width: 100%;
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    color: var(--text);
+    outline: none;
+    margin-bottom: 12px;
+    transition: border-color 0.12s;
+  }
+  .login-field:focus { border-color: var(--green); }
+  .login-field::placeholder { color: var(--text-muted); }
+  .login-btn {
+    width: 100%;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 800;
+    font-size: 15px;
+    padding: 10px;
+    border-radius: 99px;
+    border: none;
+    background: var(--green);
+    color: #fff;
+    cursor: pointer;
+    transition: background 0.12s;
+    margin-top: 4px;
+  }
+  .login-btn:hover { background: var(--green-dark); }
+  .login-btn:disabled { opacity: 0.4; cursor: default; }
+  .login-error {
+    font-size: 12px; color: var(--red);
+    margin-top: 10px; min-height: 18px;
+  }
+
+  .topbar {
+    width: 100%;
+    max-width: 960px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 0 14px;
+  }
+  .logo {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    font-size: 22px;
+    color: var(--green);
+    letter-spacing: -0.5px;
+    flex-shrink: 0;
+  }
+  .logo span { color: var(--text); }
+  .xp-bar-wrap {
+    flex: 1;
+    background: var(--surface2);
+    border-radius: 99px;
+    height: 14px;
+    overflow: hidden;
+    position: relative;
+  }
+  .xp-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green) 0%, #80ff00 100%);
+    border-radius: 99px;
+    width: 62%;
+    transition: width 0.6s cubic-bezier(.34,1.56,.64,1);
+    position: relative;
+  }
+  .xp-bar-fill::after {
+    content: '';
+    position: absolute;
+    top: 3px; left: 8px; right: 8px; height: 3px;
+    background: rgba(255,255,255,0.35);
+    border-radius: 99px;
+  }
+  .stat-chip {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--surface2);
+    border: 1.5px solid var(--border);
+    border-radius: 99px;
+    padding: 4px 12px;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 800;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .stat-chip .icon { font-size: 16px; }
+  .chip-streak .icon { color: var(--orange); }
+  .chip-xp    .icon { color: var(--gold); }
+  .chip-hearts .icon { color: var(--red); }
+
+  /* ── SHELL ───────────────────────────────────── */
+  .shell {
+    width: 100%;
+    max-width: 960px;
+    display: grid;
+    grid-template-columns: 190px 1fr 240px;
+    grid-template-rows: auto 1fr;
+    background: var(--surface);
+    border-radius: var(--radius-xl);
+    border: 1.5px solid var(--border);
+    overflow: hidden;
+    min-height: 580px;
+  }
+
+  /* ── SIDEBAR ─────────────────────────────────── */
+  .sidebar {
+    border-right: 1.5px solid var(--border);
+    background: var(--surface);
+    overflow-y: auto;
+    padding: 14px 0 24px;
+    grid-row: 1 / 3;
+    display: flex;
+    flex-direction: column;
+  }
+  .sidebar-head {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 0 14px 10px;
+  }
+  .art-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: background 0.12s;
+    position: relative;
+  }
+  .art-item:hover { background: var(--surface2); }
+  .art-item.active {
+    border-left-color: var(--green);
+    background: rgba(88,204,2,0.08);
+  }
+  .art-num {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 800;
+    font-size: 13px;
+    color: var(--text-muted);
+    min-width: 20px;
+  }
+  .art-item.active .art-num { color: var(--green); }
+  .art-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-dim);
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .art-item.active .art-label { color: var(--text); }
+  .art-badge {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px;
+  }
+  .badge-done   { background: var(--green); color: #fff; }
+  .badge-prog   { background: var(--orange); color: #fff; }
+  .badge-none   { background: var(--surface3); }
+  .ws-dismiss {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; cursor: pointer;
+    background: transparent; color: var(--text-muted);
+    transition: background .15s, color .15s;
+    margin-left: 4px;
+  }
+  .ws-dismiss:hover { background: var(--red); color: #fff; }
+  .art-stars {
+    display: flex;
+    gap: 2px;
+    position: absolute;
+    right: 8px; top: 50%;
+    transform: translateY(-50%);
+  }
+  .star { font-size: 9px; }
+  .star.on  { color: var(--gold); }
+  .star.off { color: var(--surface3); }
+
+  /* ── MAIN ────────────────────────────────────── */
+  .main {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg);
+    grid-row: 1 / 3;
+  }
+
+  .art-header {
+    padding: 16px 20px 12px;
+    border-bottom: 1.5px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .art-title {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    font-size: 20px;
+    color: var(--text);
+    line-height: 1.1;
+  }
+  .art-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 3px;
+    font-weight: 500;
+  }
+  .diff-pills { display: flex; gap: 5px; flex-shrink: 0; }
+  .diff-pill {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 800;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 99px;
+    border: 2px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .diff-pill:hover { border-color: var(--green); color: var(--green); }
+  .diff-pill.active {
+    background: var(--green);
+    border-color: var(--green);
+    color: #fff;
+  }
+  .reset-btn {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 800;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 99px;
+    border: 2px solid var(--orange);
+    background: transparent;
+    color: var(--orange);
+    cursor: pointer;
+    transition: all 0.12s;
+    margin-left: 8px;
+  }
+  .reset-btn:hover {
+    background: rgba(255, 150, 0, 0.1);
+    border-color: var(--orange);
+  }
+
+  .word-area {
+    flex: 1;
+    padding: 18px 20px;
+    overflow-y: auto;
+    line-height: 2.5;
+  }
+  .word {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    padding: 3px 8px;
+    margin: 2px 2px;
+    border-radius: var(--radius-sm);
+    border: 2px solid transparent;
+    cursor: default;
+    transition: all 0.18s;
+    position: relative;
+    font-weight: 500;
+  }
+  .word.pending {
+    color: var(--text);
+    background: var(--surface2);
+    border-color: var(--border);
+  }
+  .word.correct {
+    color: #0a3a1a;
+    background: var(--green-bg);
+    border-color: var(--green);
+    animation: stamp 0.25s ease-out;
+  }
+  .word.wrong {
+    color: #5a0000;
+    background: var(--red-bg);
+    border-color: var(--red);
+    animation: wobble 0.3s ease-out;
+  }
+  .word.missing {
+    color: var(--text-muted);
+    background: transparent;
+    border-color: var(--surface3);
+    opacity: 0.5;
+  }
+  .word.func-word {
+    color: var(--text-dim);
+    background: transparent;
+    border-color: transparent;
+    font-size: 13px;
+  }
+  @keyframes stamp {
+    0% { transform: scale(1.15); }
+    100% { transform: scale(1); }
+  }
+  @keyframes wobble {
+    0%,100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+  }
+
+  /* ── CONTROLS ────────────────────────────────── */
+  .controls {
+    padding: 12px 20px;
+    border-top: 1.5px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .mic-btn {
+    width: 46px; height: 46px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    border: 2.5px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .mic-btn:hover { border-color: var(--green); color: var(--green); }
+  .mic-btn.listening {
+    background: rgba(88,204,2,0.12);
+    border-color: var(--green);
+    color: var(--green);
+    animation: pulse-ring 1.4s infinite;
+  }
+  .mic-btn.stopped {
+    border-color: var(--red);
+    color: var(--red);
+  }
+  @keyframes pulse-ring {
+    0%,100% { box-shadow: 0 0 0 0 rgba(255,75,75,0.3); }
+    50% { box-shadow: 0 0 0 10px rgba(255,75,75,0); }
+  }
+  
+  /* Sound toggle button */
+  .sound-toggle-btn {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    border: 1.5px solid var(--border);
+    background: var(--surface2);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+  .sound-toggle-btn:hover { border-color: var(--text); color: var(--text); }
+  .sound-toggle-btn.on {
+    border-color: var(--green);
+    color: var(--green);
+  }
+  .transcript {
+    flex: 1;
+    font-size: 12.5px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-muted);
+    padding: 9px 12px;
+    background: var(--bg);
+    border-radius: var(--radius);
+    border: 1.5px solid var(--border);
+    min-height: 22px;
+    font-weight: 500;
+  }
+  .transcript.live { color: var(--blue); border-color: var(--blue); }
+
+  .score-badge {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    font-size: 20px;
+    min-width: 56px;
+    text-align: right;
+  }
+  .score-badge.good { color: var(--green); }
+  .score-badge.bad  { color: var(--red); }
+
+  /* ── COACH PANEL ─────────────────────────────── */
+  .coach-panel {
+    border-left: 1.5px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    grid-row: 1 / 3;
+    position: relative;
+  }
+
+  /* Coach character */
+  .coach-character-wrap {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 12px 0;
+    border-bottom: 1.5px solid var(--border);
+    background: linear-gradient(180deg, rgba(88,204,2,0.08) 0%, transparent 100%);
+    min-height: 130px;
+  }
+  .coach-bubble {
+    background: var(--surface2);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    border-bottom-left-radius: 4px;
+    padding: 8px 11px;
+    font-size: 12px;
+    color: var(--text);
+    font-weight: 500;
+    line-height: 1.4;
+    max-width: 190px;
+    align-self: flex-start;
+    margin-bottom: 8px;
+    min-height: 38px;
+    transition: all 0.2s;
+  }
+  .coach-bubble em { color: var(--green); font-style: normal; font-weight: 700; }
+  .coach-bubble .bubble-sad { color: var(--orange); font-style: normal; font-weight: 700; }
+
+  /* The coach owl/mascot built in SVG */
+  .coach-svg-wrap {
+    width: 80px;
+    height: 80px;
+    position: absolute;
+    bottom: -10px;
+    right: 10px;
+    animation: coach-idle 3s ease-in-out infinite;
+  }
+  @keyframes coach-idle {
+    0%,100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+  .coach-svg-wrap.coach-wave { animation: coach-wave 0.6s ease-out forwards; }
+  @keyframes coach-wave {
+    0% { transform: translateY(0) rotateZ(0deg); }
+    25% { transform: translateY(-8px) rotateZ(-3deg); }
+    50% { transform: translateY(-12px) rotateZ(3deg); }
+    75% { transform: translateY(-8px) rotateZ(-3deg); }
+    100% { transform: translateY(-5px) rotateZ(0deg); animation-play-state: paused; }
+  }
+  .coach-svg-wrap.coach-celebrate { animation: coach-celebrate 0.7s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards; }
+  @keyframes coach-celebrate {
+    0% { transform: translateY(0) scale(1); }
+    30% { transform: translateY(-16px) scale(1.1) rotateZ(-2deg); }
+    60% { transform: translateY(-10px) scale(1.05) rotateZ(2deg); }
+    100% { transform: translateY(-5px) scale(1) rotateZ(0deg); animation-play-state: paused; }
+  }
+  .coach-svg-wrap.coach-facepalm { animation: coach-facepalm 0.8s ease-in-out forwards; }
+  @keyframes coach-facepalm {
+    0% { transform: translateY(0) rotateX(0deg); }
+    30% { transform: translateY(2px) rotateX(0deg); }
+    50% { transform: translateY(1px) rotateX(-8deg); opacity: 0.85; }
+    100% { transform: translateY(1px) rotateX(-8deg) scaleY(0.95); opacity: 0.85; animation-play-state: paused; }
+  }
+  .coach-svg-wrap.coach-angry { animation: coach-angry 0.6s ease-out forwards; }
+  @keyframes coach-angry {
+    0% { transform: translateY(0) rotateZ(0deg) rotateX(0deg); }
+    20% { transform: translateY(2px) rotateZ(-2deg) rotateX(-10deg); }
+    40% { transform: translateY(1px) rotateZ(3deg) rotateX(-10deg); }
+    60% { transform: translateY(2px) rotateZ(-2deg) rotateX(-10deg); }
+    100% { transform: translateY(2px) rotateZ(0deg) rotateX(-10deg); animation-play-state: paused; }
+  }
+  .coach-svg-wrap.coach-milestone { animation: coach-milestone 1s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards; }
+  @keyframes coach-milestone {
+    0% { transform: translateY(0) scale(1) rotateZ(0deg); }
+    25% { transform: translateY(-18px) scale(1.15) rotateZ(-5deg); }
+    50% { transform: translateY(-12px) scale(1.1) rotateZ(5deg); }
+    75% { transform: translateY(-8px) scale(1.05) rotateZ(-2deg); }
+    100% { transform: translateY(-5px) scale(1) rotateZ(0deg); animation-play-state: paused; }
+  }
+
+  /* Progress in coach */
+  .coach-progress {
+    padding: 10px 14px 6px;
+    border-bottom: 1.5px solid var(--border);
+  }
+  .coach-progress-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .coach-progress-row span:last-child { color: var(--gold); }
+  .prog-bar {
+    height: 8px;
+    background: var(--bg);
+    border-radius: 99px;
+    overflow: hidden;
+    border: 1.5px solid var(--border);
+  }
+  .prog-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green) 0%, #a0ff00 100%);
+    border-radius: 99px;
+    transition: width 0.6s cubic-bezier(.34,1.56,.64,1);
+  }
+
+  /* Hint body */
+  .coach-body {
+    flex: 1;
+    padding: 12px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .hint-card {
+    background: var(--surface2);
+    border-radius: var(--radius);
+    border: 1.5px solid var(--border);
+    padding: 10px 11px;
+    animation: fadeSlide 0.25s ease-out;
+  }
+  @keyframes fadeSlide {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .hint-label {
+    font-size: 9.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin-bottom: 5px;
+  }
+  .hint-word {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    font-size: 16px;
+    color: var(--red);
+    margin-bottom: 4px;
+  }
+  .hint-text {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+  .spell-tiles {
+    display: flex;
+    gap: 3px;
+    flex-wrap: wrap;
+    margin-top: 7px;
+  }
+  .tile {
+    width: 24px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 5px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    border: 2px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+  }
+  .tile.ok  { background: var(--green-bg); border-color: var(--green); color: #0a3a1a; }
+  .tile.err { background: var(--red-bg);   border-color: var(--red);   color: #5a0000; }
+
+  /* Hint toggle */
+  .hint-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-bottom: 1.5px solid var(--border);
+  }
+  .hint-label-sm {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .hint-toggle-btn {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 800;
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 99px;
+    border: 2px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .hint-toggle-btn.on {
+    background: rgba(88,204,2,0.15);
+    border-color: var(--green);
+    color: var(--green);
+  }
+
+  /* ── UPLOAD MODAL ─────────────────────────── */
+  .overlay {
+    position: fixed; inset: 0; z-index: 900;
+    background: rgba(0,0,0,0.7);
+    display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+  .overlay.hidden { display: none; }
+  .upload-modal {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-xl);
+    width: 90%; max-width: 680px;
+    max-height: 85vh;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .upload-head {
+    padding: 18px 22px 14px;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    font-size: 18px;
+    border-bottom: 1.5px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .upload-close {
+    background: none; border: none; color: var(--text-muted);
+    font-size: 22px; cursor: pointer; padding: 0 4px;
+  }
+  .upload-close:hover { color: var(--text); }
+  .upload-tabs {
+    display: flex;
+    border-bottom: 1.5px solid var(--border);
+    background: var(--bg);
+  }
+  .upload-tab {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 800;
+    font-size: 12px;
+    padding: 10px 16px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-bottom: 2.5px solid transparent;
+    transition: all 0.12s;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .upload-tab:hover { color: var(--text); }
+  .upload-tab.active {
+    color: var(--green);
+    border-bottom-color: var(--green);
+  }
+  .upload-body {
+    padding: 18px 22px;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .upload-pane { display: block; }
+  .upload-pane.hidden { display: none; }
+
+  /* CSV drop zone */
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 36px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .drop-zone:hover, .drop-zone.dragover {
+    border-color: var(--green);
+    background: rgba(88,204,2,0.04);
+  }
+  .drop-zone-icon { font-size: 36px; color: var(--text-muted); margin-bottom: 8px; }
+  .drop-zone-text { font-size: 14px; color: var(--text-dim); font-weight: 600; }
+  .drop-zone-sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+  .upload-preview { margin-top: 16px; }
+  .upload-preview table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .upload-preview th {
+    text-align: left;
+    color: var(--text-muted);
+    font-weight: 700;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 6px 8px;
+    border-bottom: 1.5px solid var(--border);
+  }
+  .upload-preview td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--surface3);
+    color: var(--text-dim);
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .upload-preview td.num { font-family: 'JetBrains Mono', monospace; color: var(--gold); width: 30px; }
+  .upload-preview tr:hover td { background: var(--surface2); }
+  .upload-footer {
+    padding: 14px 22px;
+    border-top: 1.5px solid var(--border);
+    display: flex; justify-content: flex-end; gap: 10px;
+    align-items: center;
+  }
+  .upload-footer .count {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-right: auto;
+  }
+  .upload-btn-top {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 800;
+    font-size: 12px;
+    padding: 5px 12px;
+    border-radius: 99px;
+    border: 1.5px solid var(--border);
+    background: var(--surface2);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.12s;
+    flex-shrink: 0;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .upload-btn-top:hover {
+    border-color: var(--blue);
+    color: var(--blue);
+    background: rgba(28,176,246,0.08);
+  }
+  .btn-primary {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 800;
+    font-size: 13px;
+    padding: 7px 18px;
+    border-radius: 99px;
+    border: none;
+    background: var(--green);
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .btn-primary:hover { background: var(--green-dark); }
+  .btn-primary:disabled { opacity: 0.4; cursor: default; }
+  .btn-cancel {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 7px 16px;
+    border-radius: 99px;
+    border: 1.5px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .btn-cancel:hover { color: var(--text); }
+  .btn-danger {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 700;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 99px;
+    border: 1.5px solid var(--red);
+    background: transparent;
+    color: var(--red);
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .btn-danger:hover { background: rgba(255,75,75,0.1); }
+  .btn-sm {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 700;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 99px;
+    border: 1.5px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .btn-sm:hover { border-color: var(--blue); color: var(--blue); }
+  .upload-result {
+    margin-top: 12px;
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .upload-result.ok { background: rgba(88,204,2,0.1); color: var(--green); }
+  .upload-result.err { background: rgba(255,75,75,0.1); color: var(--red); }
+
+  /* Add/edit form */
+  .article-form { display: flex; flex-direction: column; gap: 12px; }
+  .field-row { display: flex; flex-direction: column; gap: 4px; }
+  .field-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+  }
+  .field-input, .field-textarea {
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.12s;
+  }
+  .field-input:focus, .field-textarea:focus { border-color: var(--green); }
+  .field-textarea { min-height: 120px; resize: vertical; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.6; }
+  .field-row-inline { display: flex; gap: 10px; }
+  .field-row-inline .field-row { flex: 1; }
+  .form-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+
+  /* Manage list */
+  .mgr-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px;
+  }
+  .mgr-count { font-size: 12px; color: var(--text-muted); }
+  .mgr-list { display: flex; flex-direction: column; gap: 6px; }
+  .mgr-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px;
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    border: 1.5px solid var(--border);
+    transition: border-color 0.12s;
+  }
+  .mgr-item:hover { border-color: var(--surface3); }
+  .mgr-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; font-weight: 600;
+    color: var(--gold);
+    min-width: 24px;
+  }
+  .mgr-info { flex: 1; min-width: 0; }
+  .mgr-title {
+    font-size: 13px; font-weight: 600;
+    color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .mgr-sub {
+    font-size: 11px; color: var(--text-muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .mgr-actions { display: flex; gap: 4px; flex-shrink: 0; }
+  .mgr-empty {
+    text-align: center; padding: 32px 0;
+    color: var(--text-muted); font-size: 13px;
+  }
+
+  /* ── MODE TABS ─────────────────────────────── */
+  .mode-tabs {
+    display: flex;
+    gap: 0;
+    background: var(--bg);
+    border-bottom: 1.5px solid var(--border);
+    padding: 0 6px;
+    overflow-x: auto;
+  }
+  .mode-tab {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 800;
+    font-size: 12px;
+    padding: 9px 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-bottom: 2.5px solid transparent;
+    white-space: nowrap;
+    transition: all 0.12s;
+  }
+  .mode-tab.active {
+    color: var(--green);
+    border-bottom-color: var(--green);
+  }
+  .mode-tab:hover:not(.active) { color: var(--text); }
+
+  /* ── DEMO CONTROLS ───────────────────────────── */
+  .demo-bar {
+    width: 100%;
+    max-width: 960px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 0 0;
+    flex-wrap: wrap;
+  }
+  .demo-label { font-size: 11px; color: var(--text-muted); font-weight: 500; margin-right: 4px; }
+  .demo-btn {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 800;
+    font-size: 12px;
+    padding: 5px 13px;
+    border-radius: 99px;
+    border: 2px solid var(--border);
+    background: var(--surface2);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .demo-btn:hover { border-color: var(--green); color: var(--green); }
+
+  /* XP flash */
+  .xp-pop {
+    position: fixed;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    font-size: 22px;
+    color: var(--gold);
+    pointer-events: none;
+    animation: xp-float 1.1s ease-out forwards;
+    z-index: 999;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  }
+  @keyframes xp-float {
+    0%   { opacity: 1; transform: translateY(0) scale(1); }
+    70%  { opacity: 1; transform: translateY(-40px) scale(1.15); }
+    100% { opacity: 0; transform: translateY(-60px) scale(0.9); }
+  }
+
+  /* Streak popup */
+  .streak-pop {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    background: var(--surface);
+    border: 2.5px solid var(--orange);
+    border-radius: var(--radius-xl);
+    padding: 24px 32px;
+    text-align: center;
+    z-index: 100;
+    animation: pop-in 0.35s cubic-bezier(.34,1.56,.64,1);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .streak-pop.hidden { display: none; }
+  @keyframes pop-in {
+    from { opacity: 0; transform: translate(-50%,-50%) scale(0.7); }
+    to   { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+  }
+  @keyframes confetti-fall {
+    0%   { transform: translateY(0)      translateX(0)      rotate(0deg);   opacity: 1; }
+    80%  { opacity: 1; }
+    100% { transform: translateY(110vh)  translateX(calc(var(--drift, 0px)))  rotate(720deg); opacity: 0; }
+  }
+  .streak-pop-num {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    font-size: 56px;
+    color: var(--orange);
+    line-height: 1;
+    margin: 8px 0 4px;
+  }
+  .streak-pop-label {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 800;
+    font-size: 16px;
+    color: var(--text);
+  }
+  .streak-pop-btn {
+    margin-top: 16px;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    font-size: 14px;
+    padding: 10px 28px;
+    border-radius: 99px;
+    border: none;
+    background: var(--orange);
+    color: #fff;
+    cursor: pointer;
+  }
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 99;
+  }
+  .overlay.hidden { display: none; }
+</style>
+</head>
+<body>
+
+<!-- Overlay + streak popup -->
+<div class="overlay hidden" id="overlay" onclick="closeStreak()"></div>
+<div class="streak-pop hidden" id="streakPop">
+  <div style="font-size:36px">🔥</div>
+  <div class="streak-pop-num" id="streakPopNum">7</div>
+  <div class="streak-pop-label">Day streak!</div>
+  <div style="font-size:12px;color:var(--text-muted);margin-top:6px">Keep it up — you're on fire.</div>
+  <button class="streak-pop-btn" onclick="closeStreak()">Keep going!</button>
+</div>
+
+<!-- TOPBAR -->
+<!-- LOGIN OVERLAY -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <div class="login-logo">Lex <span>Memoria</span></div>
+    <div class="login-sub">Sign in to start learning</div>
+    <input class="login-field" id="loginEmail" type="email" placeholder="Email" autocomplete="email" onkeydown="if(event.key==='Enter')login()">
+    <input class="login-field" id="loginPass" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()">
+    <button class="login-btn" id="loginBtn" onclick="login()">Sign In</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<div class="topbar">
+  <div class="logo">Lex <span>Memoria</span></div>
+  <div class="xp-bar-wrap" title="1240 / 2000 XP to next level">
+    <div class="xp-bar-fill" id="xpBarFill" style="width:62%"></div>
+  </div>
+  <div class="stat-chip chip-streak" onclick="showStreak()" style="cursor:pointer" title="Tap to see streak">
+    <span class="icon">🔥</span>
+    <span id="streakCount">7</span>
+  </div>
+  <div class="stat-chip chip-xp">
+    <span class="icon">⚡</span>
+    <span id="xpCount">1,240</span>
+  </div>
+  <div class="stat-chip chip-hearts">
+    <span class="icon">❤️</span>
+    <span id="heartsCount">4</span>
+  </div>
+  <button class="sound-toggle-btn on" id="soundToggleBtn" onclick="toggleSound()" title="Sound on/off">
+    <i id="soundIcon" class="ti ti-volume-2"></i>
+  </button>
+  <button class="upload-btn-top" onclick="openUpload()">
+    <i class="ti ti-file-upload"></i> CSV
+  </button>
+  <button class="upload-btn-top" onclick="logout()" title="Sign out">
+    <i class="ti ti-logout"></i>
+  </button>
+</div>
+
+<!-- SHELL -->
+<div class="shell">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-head" id="sidebarHead">Loading articles…</div>
+    <div id="sidebarList"></div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <!-- mode tabs -->
+    <div class="mode-tabs">
+      <button class="mode-tab active" onclick="setMode(this, 'linear')">Linear</button>
+      <button class="mode-tab" onclick="setMode(this, 'random')">Random</button>
+      <button class="mode-tab" onclick="setMode(this, 'weakspots')">Weak spots</button>
+      <button class="mode-tab" onclick="setMode(this, 'selected')">Selected</button>
+    </div>
+
+    <!-- article header -->
+    <div class="art-header">
+      <div>
+        <div class="art-title" id="articleTitle">Article 2</div>
+        <div class="art-sub" id="artSub">Chapter 1 — Effect and Application of Laws</div>
+      </div>
+      <div class="diff-pills">
+        <button class="diff-pill active" onclick="setDiff(this,1)">Full</button>
+        <button class="diff-pill" onclick="setDiff(this,2)">A__</button>
+        <button class="diff-pill" onclick="setDiff(this,3)">_ _</button>
+        <button class="diff-pill" onclick="setDiff(this,4)">Blind</button>
+        <button class="reset-btn" onclick="resetProgress()" title="Reset progress for this article">↺ Reset</button>
+      </div>
+    </div>
+
+    <!-- words -->
+    <div class="word-area" id="wordArea"></div>
+
+    <!-- controls -->
+    <div class="controls">
+      <button class="mic-btn" id="micBtn" onclick="toggleMic()">
+        <i class="ti ti-microphone"></i>
+      </button>
+      <div class="transcript" id="transcript">Tap the mic to start reciting…</div>
+      <div class="score-badge" id="scoreBadge"></div>
+    </div>
+  </div>
+
+  <!-- COACH -->
+  <div class="coach-panel">
+
+    <!-- Character at top -->
+    <div class="coach-character-wrap">
+      <div class="coach-bubble" id="coachBubble">
+        Start reciting and I'll help you along!
+      </div>
+      <!-- SVG Owl Coach -->
+      <div class="coach-svg-wrap" id="coachSvg">
+        <svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg" width="80" height="80">
+          <!-- Body -->
+          <ellipse cx="40" cy="52" rx="22" ry="24" fill="#2d6a2a"/>
+          <!-- Belly -->
+          <ellipse cx="40" cy="57" rx="14" ry="16" fill="#3d8f3a"/>
+          <!-- Head -->
+          <circle cx="40" cy="28" r="22" fill="#2d6a2a"/>
+          <!-- Head highlight -->
+          <circle cx="40" cy="26" r="18" fill="#359932"/>
+
+          <!-- Left ear tuft -->
+          <polygon points="22,14 18,4 28,10" fill="#2d6a2a"/>
+          <!-- Right ear tuft -->
+          <polygon points="58,14 62,4 52,10" fill="#2d6a2a"/>
+
+          <!-- Eyes: white rings -->
+          <circle cx="31" cy="27" r="10" fill="white"/>
+          <circle cx="49" cy="27" r="10" fill="white"/>
+          <!-- Eye rings -->
+          <circle cx="31" cy="27" r="8" fill="#fff" stroke="#ddd" stroke-width="1"/>
+          <circle cx="49" cy="27" r="8" fill="#fff" stroke="#ddd" stroke-width="1"/>
+          <!-- Irises -->
+          <circle cx="31" cy="27" r="6" fill="#1a7adb" id="eyeL"/>
+          <circle cx="49" cy="27" r="6" fill="#1a7adb" id="eyeR"/>
+          <!-- Pupils -->
+          <circle cx="31" cy="27" r="3.5" fill="#0a0a18" id="pupilL"/>
+          <circle cx="49" cy="27" r="3.5" fill="#0a0a18" id="pupilR"/>
+          <!-- Eye shine -->
+          <circle cx="33" cy="25" r="1.5" fill="white"/>
+          <circle cx="51" cy="25" r="1.5" fill="white"/>
+
+          <!-- Beak -->
+          <polygon points="40,31 35,38 45,38" fill="#ffc800" id="beak"/>
+          
+          <!-- Mouth: happy neutral default -->
+          <path id="coachMouth" d="M 36 42 Q 40 44 44 42" stroke="#0a0a18" stroke-width="2" fill="none" stroke-linecap="round"/>
+          
+          <!-- Left arm/wing with hand -->
+          <g id="coachLeftArm">
+            <ellipse cx="20" cy="54" rx="9" ry="14" fill="#2d6a2a" transform="rotate(-15 20 54)"/>
+            <!-- Hand -->
+            <circle cx="16" cy="40" r="6" fill="#8fba2f"/>
+          </g>
+          
+          <!-- Right arm/wing with hand -->
+          <g id="coachRightArm">
+            <ellipse cx="60" cy="54" rx="9" ry="14" fill="#2d6a2a" transform="rotate(15 60 54)"/>
+            <!-- Hand -->
+            <circle cx="64" cy="40" r="6" fill="#8fba2f"/>
+          </g>
+
+          <!-- Feet -->
+          <ellipse cx="33" cy="74" rx="7" ry="4" fill="#ffc800" transform="rotate(-10 33 74)"/>
+          <ellipse cx="47" cy="74" rx="7" ry="4" fill="#ffc800" transform="rotate(10 47 74)"/>
+          
+          <!-- Sweat drop (hidden by default, shown on facepalm/worried) -->
+          <g id="coachSweat" opacity="0">
+            <circle cx="58" cy="12" r="3" fill="#7cc6ff"/>
+            <path d="M 58 15 Q 56 18 58 22" stroke="#7cc6ff" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.6"/>
+          </g>
+          
+          <!-- Anger veins (hidden by default, shown when angry) -->
+          <g id="coachVeins" opacity="0">
+            <line x1="20" y1="8" x2="15" y2="4" stroke="#ff6b6b" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="22" y1="6" x2="18" y2="2" stroke="#ff6b6b" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="60" y1="8" x2="65" y2="4" stroke="#ff6b6b" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="58" y1="6" x2="62" y2="2" stroke="#ff6b6b" stroke-width="1.5" stroke-linecap="round"/>
+          </g>
+          
+          <!-- Speed lines (hidden by default, shown when angry/hyped) -->
+          <g id="coachSpeedLines" opacity="0">
+            <line x1="5" y1="40" x2="0" y2="40" stroke="#ff9600" stroke-width="2" stroke-linecap="round"/>
+            <line x1="8" y1="50" x2="2" y2="50" stroke="#ff9600" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+            <line x1="10" y1="30" x2="3" y2="30" stroke="#ff9600" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+            <line x1="75" y1="40" x2="80" y2="40" stroke="#ff9600" stroke-width="2" stroke-linecap="round"/>
+            <line x1="72" y1="50" x2="78" y2="50" stroke="#ff9600" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+            <line x1="70" y1="30" x2="77" y2="30" stroke="#ff9600" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+          </g>
+
+          <!-- Book in wings -->
+          <rect x="26" y="56" width="28" height="18" rx="3" fill="#1cb0f6" opacity="0.9"/>
+          <rect x="28" y="58" width="24" height="14" rx="2" fill="#ddf4ff"/>
+          <line x1="40" y1="58" x2="40" y2="72" stroke="#1cb0f6" stroke-width="1.5"/>
+          <line x1="30" y1="62" x2="38" y2="62" stroke="#1cb0f6" stroke-width="1"/>
+          <line x1="30" y1="65" x2="38" y2="65" stroke="#1cb0f6" stroke-width="1"/>
+          <line x1="42" y1="62" x2="50" y2="62" stroke="#1cb0f6" stroke-width="1"/>
+          <line x1="42" y1="65" x2="50" y2="65" stroke="#1cb0f6" stroke-width="1"/>
+
+          <!-- Mortarboard hat -->
+          <ellipse cx="40" cy="10" rx="18" ry="4" fill="#0a0a2a"/>
+          <rect x="30" y="6" width="20" height="5" rx="2" fill="#0a0a2a"/>
+          <!-- Tassel -->
+          <line x1="58" y1="10" x2="62" y2="18" stroke="#ffc800" stroke-width="2"/>
+          <circle cx="62" cy="20" r="3" fill="#ffc800"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Progress bar -->
+    <div class="coach-progress">
+      <div class="coach-progress-row">
+        <span id="progressText">3 / 38 words</span>
+        <span id="bestScore">Best: 71%</span>
+      </div>
+      <div class="prog-bar">
+        <div class="prog-fill" id="progressFill" style="width:8%"></div>
+      </div>
+    </div>
+
+    <!-- Hint toggle -->
+    <div class="hint-toggle-row">
+      <span class="hint-label-sm"><i class="ti ti-bulb" style="color:var(--gold)"></i> Hints</span>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="hint-toggle-btn" id="showWordsToggle" onclick="toggleShowWords()" title="Show/hide the actual word in hints">👁 Words</button>
+        <button class="hint-toggle-btn on" id="hintToggle" onclick="toggleHints()">ON</button>
+      </div>
+    </div>
+
+    <!-- Hints -->
+    <div class="coach-body" id="coachBody"></div>
+  </div>
+
+</div>
+
+<!-- DEMO BAR -->
+<div class="demo-bar">
+  <span class="demo-label">Try:</span>
+  <button class="demo-btn" onclick="simulateScore()">▶ Simulate score</button>
+  <button class="demo-btn" onclick="resetWords()">↺ Reset</button>
+  <button class="demo-btn" onclick="toggleMic()">🎙 Toggle mic</button>
+  <button class="demo-btn" onclick="cycleDifficulty()">🎯 Cycle difficulty</button>
+  <button class="demo-btn" onclick="showStreak()">🔥 Streak popup</button>
+</div>
+
+<!-- UPLOAD MODAL -->
+<div class="overlay hidden" id="uploadOverlay">
+  <div class="upload-modal">
+    <div class="upload-head">
+      <span>📄 Article Manager</span>
+      <button class="upload-close" onclick="closeUpload()">&times;</button>
+    </div>
+    <div class="upload-tabs">
+      <button class="upload-tab active" onclick="switchUploadTab('csv', this)">📄 CSV</button>
+      <button class="upload-tab" onclick="switchUploadTab('add', this)">➕ Add</button>
+      <button class="upload-tab" onclick="switchUploadTab('manage', this)">📋 Manage</button>
+    </div>
+    <div class="upload-body">
+      <!-- CSV pane -->
+      <div id="uploadPaneCsv" class="upload-pane">
+        <input type="file" id="csvFileInput" accept=".csv,.txt" style="display:none" onchange="handleFile(this)">
+        <div class="drop-zone" id="dropZone"
+          onclick="document.getElementById('csvFileInput').click()"
+          ondragover="handleDragOver(event)"
+          ondragleave="handleDragLeave(event)"
+          ondrop="handleDrop(event)">
+          <div class="drop-zone-icon"><i class="ti ti-file-spreadsheet"></i></div>
+          <div class="drop-zone-text">Drop a CSV file here or click to browse</div>
+          <div class="drop-zone-sub">Expected columns: book, chapter, article_number, title, content_md</div>
+        </div>
+        <div style="margin-top:10px;display:flex;align-items:center;gap:8px;color:var(--text-muted);font-size:11px;font-weight:600">
+          <span style="flex:1;height:1px;background:var(--border)"></span>
+          <span>or paste CSV text below</span>
+          <span style="flex:1;height:1px;background:var(--border)"></span>
+        </div>
+        <textarea id="csvPasteArea" class="field-textarea" style="min-height:80px;margin-top:8px" placeholder="Paste CSV text here (header row + data rows)…" oninput="handleCsvPaste(this.value)"></textarea>
+        <div class="upload-preview" id="uploadPreview" style="display:none">
+          <table>
+            <thead><tr><th>#</th><th>Art.</th><th>Title</th><th>Book / Chapter</th></tr></thead>
+            <tbody id="previewBody"></tbody>
+          </table>
+        </div>
+        <div id="uploadCsvResult" class="upload-result" style="display:none"></div>
+        <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn-primary" id="confirmUploadBtn" onclick="confirmUpload()" disabled>Upload CSV</button>
+        </div>
+      </div>
+      <!-- Add pane -->
+      <div id="uploadPaneAdd" class="upload-pane hidden">
+        <form class="article-form" id="articleForm" onsubmit="return false">
+          <div class="field-row-inline">
+            <div class="field-row">
+              <label class="field-label">Book</label>
+              <input class="field-input" id="addBook" placeholder='e.g. "Book 1"'>
+            </div>
+            <div class="field-row">
+              <label class="field-label">Article Number</label>
+              <input class="field-input" id="addNumber" type="number" min="1" placeholder="1">
+            </div>
+          </div>
+          <div class="field-row">
+            <label class="field-label">Chapter</label>
+            <input class="field-input" id="addChapter" placeholder='e.g. "Chapter 1 — Effect and Application of Laws"'>
+          </div>
+          <div class="field-row">
+            <label class="field-label">Title</label>
+            <input class="field-input" id="addTitle" placeholder='e.g. "Article 1"'>
+          </div>
+          <div class="field-row">
+            <label class="field-label">Content (Markdown)</label>
+            <textarea class="field-textarea" id="addContent" placeholder="Full article text..."></textarea>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn-cancel" onclick="clearForm()">Clear</button>
+            <button type="button" class="btn-primary" id="addArticleBtn" onclick="submitArticle()">Add Article</button>
+          </div>
+        </form>
+        <div id="uploadAddResult" class="upload-result" style="display:none"></div>
+      </div>
+      <!-- Manage pane -->
+      <div id="uploadPaneManage" class="upload-pane hidden">
+        <div class="mgr-header">
+          <span class="mgr-count" id="mgrCount">Loading articles…</span>
+          <button class="btn-sm" onclick="loadManageArticles()">↻ Refresh</button>
+        </div>
+        <div class="mgr-list" id="mgrList"></div>
+        <div id="uploadMgrResult" class="upload-result" style="display:none"></div>
+      </div>
+    </div>
+    <div class="upload-footer">
+      <button class="btn-cancel" onclick="closeUpload()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────
+let articles = [];
+let curArticleIdx = 0;
+let curDiff = 1;
+let isListening = false;
+let recognitionActive = false;
+let mode = 'linear';
+let shuffledOrder = [];
+let selectedArticles = new Set();
+let progressData = null;
+let modeArticleOrder = [];
+let dismissedWeakSpots = new Set();
+let hintsOn = true;
+let showWordsInHints = false;
+let wordStates = [];
+let tokens = [];
+let xp = 0;
+let streak = 0;
+let hearts = 5;
+let soundOn = true;
+let authToken = null;
+let supabaseClient = null;
+let currentSessionId = null;
+let recognition = null;
+let finalTranscript = '';
+let interimTranscript = '';
+let recognitionRestartTimer = null;
+let silenceTimer = null;
+
+const COACH_MSGS = {
+  idle:    'Start reciting and I\'ll help you along!',
+  cheer:   '🎉 <em>Amazing!</em> Keep that streak alive!',
+  partial: '📖 Good effort! Focus on the <bubble-sad>highlighted</bubble-sad> words.',
+  wrong:   '💡 Don\'t worry — mistakes build memory. Try again!',
+  blind:   '🧠 Blind mode? You\'re a legend.',
+};
+
+// Coach speech message pools for context-aware TTS
+const COACH_SPEECH_POOLS = {
+  sessionStart: [
+    "Alright, counsel, time to put on the suit and lock in. Let's crush this session!",
+    "Standard of review today? Flawless. Let's get to work!",
+    "Elements of a winning study session: focus, fire, and zero excuses. Let me hear it!",
+    "Court is in session! Time to build that bulletproof recall.",
+  ],
+  correct: [
+    "Boom! Sustained! Absolutely textbook!",
+    "Yes! That's precedent-setting speed right there!",
+    "Flawless execution! You locked down those elements like a pro!",
+    "Awesome! Good job! That recall was pure muscle memory!",
+    "Nailed it! Opposing counsel wouldn't stand a chance against that!",
+  ],
+  streak3: [
+    "Three in a row! You're in the zone—don't slow down now!",
+  ],
+  streak5: [
+    "Five straight! You are tearing through this doctrine!",
+    "Unstoppable! You've got the full court's attention now! Keep driving!",
+  ],
+  streak10: [
+    "Ten in a row?! Unbelievable! You're not just memorizing, you own this law!",
+  ],
+  stumble: [
+    "Overruled! Shake it off, take a breath, and hit 'em with the right rule.",
+    "Minor objection! Adjust the argument and let's go again.",
+    "Tough clause! No sweat—re-read the elements and lock it in!",
+    "Eyes up, legal eagle! Every mistake is just a stronger brief in the making.",
+  ],
+  sessionEnd: [
+    "Case closed! Outstanding performance today!",
+    "Mastery unlocked! That doctrine didn't know what hit it. Great freaking job!",
+    "Pack up your briefcases—that session was absolute perfection!",
+    "Daily goal destroyed! Go take a breather, you earned it counsel!",
+  ],
+};
+
+// ─── Article Progress Tracking ────────────────────────────────
+let articlesCompleted = 0;  // Count of perfect (100%) attempts
+let consecutivePerfect = 0;  // Streak of perfect articles
+
+function trackArticleCompletion(percentCorrect) {
+  if (percentCorrect === 100) {
+    articlesCompleted++;
+    consecutivePerfect++;
+    
+    // Trigger milestone animations and speech
+    if (consecutivePerfect === 1) {
+      triggerCoachState('wave');
+      speakCoachMessage('correct');
+    } else if (consecutivePerfect === 3) {
+      triggerCoachState('milestone');
+      speakCoachMessage('streak3');
+    } else if (consecutivePerfect === 5) {
+      triggerCoachState('celebrate');
+      speakCoachMessage('streak5');
+    } else if (consecutivePerfect >= 10 && consecutivePerfect % 10 === 0) {
+      triggerCoachState('celebrate');
+      speakCoachMessage('streak10');
+    }
+  } else {
+    consecutivePerfect = 0;  // Reset streak
+  }
+  
+  updateArticleProgressBar();
+  checkAllComplete();
+}
+
+function updateArticleProgressBar() {
+  const totalArticles = articles.length || 1;
+  const progressPct = Math.round((articlesCompleted / totalArticles) * 100);
+  document.getElementById('xpBarFill').style.width = progressPct + '%';
+  const xpDisplay = document.getElementById('xpBarFill').parentElement;
+  xpDisplay.title = articlesCompleted + ' / ' + totalArticles + ' articles completed perfectly';
+}
+
+// ── Confetti burst ──────────────────────────────────────────
+function launchConfetti() {
+  const colors = ['#58cc02','#ffc800','#1cb0f6','#ff4b4b','#ce82ff','#ff9600'];
+  const count = 120;
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement('div');
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    const size = Math.random() * 10 + 6;
+    const startX = Math.random() * window.innerWidth;
+    const drift = (Math.random() - 0.5) * 300;
+    const duration = Math.random() * 1800 + 1400;
+    el.style.cssText = `
+      position:fixed;
+      left:${startX}px;
+      top:-20px;
+      width:${size}px;
+      height:${size * (Math.random() > 0.5 ? 1 : 2.5)}px;
+      background:${color};
+      border-radius:${Math.random() > 0.5 ? '50%' : '2px'};
+      pointer-events:none;
+      z-index:9999;
+      opacity:1;
+      --drift:${drift}px;
+      animation:confetti-fall ${duration}ms ease-in forwards;
+      animation-delay:${Math.random() * 400}ms;
+    `;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), duration + 500);
+  }
+}
+
+function restartAll() {
+  document.getElementById('allDoneModal').classList.add('hidden');
+  articlesCompleted = 0;
+  consecutivePerfect = 0;
+  wordStates = tokens.map(() => 'pending');
+  tokens.forEach((_, i) => updateWordEl(i));
+  if (articles.length > 0) selectArticle(modeArticleOrder[0] ?? 0);
+  resetTranscript();
+}
+
+function checkAllComplete() {
+  const total = (modeArticleOrder.length > 0 ? modeArticleOrder : articles.map((_, i) => i)).length;
+  if (articlesCompleted >= total && total > 0) {
+    launchConfetti();
+    speakCoachMessage('sessionEnd');
+    setTimeout(() => {
+      document.getElementById('allDoneModal').classList.remove('hidden');
+    }, 1200);
+  }
+}
+
+function triggerCoachState(state) {
+  const svg = document.getElementById('coachSvg');
+  const mouth = document.getElementById('coachMouth');
+  const sweat = document.getElementById('coachSweat');
+  const veins = document.getElementById('coachVeins');
+  const speedLines = document.getElementById('coachSpeedLines');
+  
+  // Reset animations
+  svg.className = 'coach-svg-wrap';
+  mouth.setAttribute('d', 'M 36 42 Q 40 44 44 42');  // neutral
+  sweat.setAttribute('opacity', '0');
+  veins.setAttribute('opacity', '0');
+  speedLines.setAttribute('opacity', '0');
+  
+  // Apply new state
+  switch(state) {
+    case 'wave':
+      svg.classList.add('coach-wave');
+      // Excited mouth: :-D
+      mouth.setAttribute('d', 'M 35 42 Q 40 45 45 42');
+      mouth.setAttribute('stroke-width', '2.5');
+      break;
+    case 'celebrate':
+      svg.classList.add('coach-celebrate');
+      // Big smile: ^_^
+      mouth.setAttribute('d', 'M 34 41 Q 40 46 46 41');
+      mouth.setAttribute('stroke-width', '3');
+      mouth.setAttribute('stroke', '#58cc02');
+      break;
+    case 'facepalm':
+      svg.classList.add('coach-facepalm');
+      // Sad mouth: :-[
+      mouth.setAttribute('d', 'M 36 43 Q 40 42 44 43');
+      mouth.setAttribute('stroke-width', '2');
+      sweat.setAttribute('opacity', '1');
+      break;
+    case 'headshake':
+      svg.classList.add('coach-facepalm');
+      // Frown: :-(
+      mouth.setAttribute('d', 'M 36 44 Q 40 41 44 44');
+      mouth.setAttribute('stroke-width', '2');
+      break;
+    case 'angry':
+      svg.classList.add('coach-angry');
+      // Angry mouth: >:-[
+      mouth.setAttribute('d', 'M 35 42 L 45 42');
+      mouth.setAttribute('stroke-width', '2.5');
+      veins.setAttribute('opacity', '1');
+      speedLines.setAttribute('opacity', '0.8');
+      break;
+    case 'milestone':
+      svg.classList.add('coach-milestone');
+      // Excited open mouth: O_O
+      mouth.setAttribute('d', 'M 37 40 Q 40 45 43 40');
+      mouth.setAttribute('stroke-width', '3');
+      mouth.setAttribute('stroke', '#ffc800');
+      break;
+    default:
+      // Idle: neutral smile
+      mouth.setAttribute('d', 'M 36 42 Q 40 44 44 42');
+      break;
+  }
+}
+
+// ─── Sound & TTS ──────────────────────────────────────────────
+function toggleSound() {
+  soundOn = !soundOn;
+  const btn = document.getElementById('soundToggleBtn');
+  const icon = document.getElementById('soundIcon');
+  if (soundOn) {
+    btn.classList.add('on');
+    icon.className = 'ti ti-volume-2';
+  } else {
+    btn.classList.remove('on');
+    icon.className = 'ti ti-volume-x';
+  }
+}
+
+// Pick the best available English voice — prefers Microsoft/Google neural/natural voices
+function getBestVoice() {
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices || voices.length === 0) return null;
+
+  // ALL rules require English lang — never pick a non-English voice
+  const isEn = v => /^en/i.test(v.lang);
+
+  const priority = [
+    v => isEn(v) && /microsoft/i.test(v.name) && /natural/i.test(v.name),
+    v => isEn(v) && /microsoft/i.test(v.name) && /neural/i.test(v.name),
+    v => isEn(v) && /microsoft/i.test(v.name),
+    v => isEn(v) && /google/i.test(v.name),
+    v => isEn(v) && /(natural|neural|premium|enhanced)/i.test(v.name),
+    v => isEn(v),
+  ];
+
+  for (const test of priority) {
+    const match = voices.find(test);
+    if (match) return match;
+  }
+  return null; // if no English voice found, let utterance.lang handle it
+}
+
+function speak(text, rate = 1.0) {
+  if (!soundOn || !text) return;
+  window.speechSynthesis.cancel(); // stop any current speech
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'en-US'; // hard-lock to English regardless of system locale
+  utterance.rate = rate;
+  utterance.pitch = 1.0;
+  utterance.volume = 0.9;
+
+  // Voices may not be loaded yet — wait if needed
+  const trySpeak = () => {
+    const voice = getBestVoice();
+    if (voice) utterance.voice = voice;
+    try { window.speechSynthesis.speak(utterance); } catch (e) { console.error('TTS error:', e); }
+  };
+
+  const voices = window.speechSynthesis.getVoices();
+  if (voices && voices.length > 0) {
+    trySpeak();
+  } else {
+    window.speechSynthesis.onvoiceschanged = () => { trySpeak(); window.speechSynthesis.onvoiceschanged = null; };
+  }
+}
+
+function speakCoachMessage(pool) {
+  const messages = COACH_SPEECH_POOLS[pool] || [];
+  if (messages.length === 0) return;
+  const msg = messages[Math.floor(Math.random() * messages.length)];
+  speak(msg);
+}
+
+// Speak from the first wrong/missing word onward (or repeat the whole sentence if needed)
+function speakFromFirstMistake() {
+  if (!soundOn || !tokens || tokens.length === 0) return;
+
+  // Find index of first wrong or missing word
+  const firstBadIdx = wordStates.findIndex(s => s === 'wrong' || s === 'missing');
+  if (firstBadIdx === -1) return; // no mistakes
+
+  // Collect raw text from that word to end of its sentence (or whole remaining text)
+  // A "sentence" ends at punctuation: . ! ?
+  let endIdx = tokens.length - 1;
+  for (let i = firstBadIdx; i < tokens.length; i++) {
+    if (/[.!?]/.test(tokens[i].raw)) { endIdx = i; break; }
+  }
+
+  const phrase = tokens.slice(firstBadIdx, endIdx + 1).map(t => t.raw).join(' ');
+  speak(phrase, 0.88); // slightly slower so they can follow along
+}
+
+// ─── API Helper ───────────────────────────────────────────────
+async function api(path, options = {}) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
+  const res = await fetch(path, { ...options, headers: { ...headers, ...options.headers } });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'API error');
+  }
+  return res.json();
+}
+
+// ─── Auth ────────────────────────────────────────────────────
+async function init() {
+  try {
+    const config = await api('/api/config');
+    supabaseClient = supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
+      auth: { persistSession: false },
+    });
+    // Try restoring session from cookie fallback
+    let session = null;
+    try { const r = await supabaseClient.auth.getSession(); session = r.data.session; } catch(e) {}
+    if (!session) {
+      const token = document.cookie.match(/(?:^|;\s*)lex_token=([^;]*)/);
+      if (token) {
+        try { await supabaseClient.auth.setSession({ access_token: token[1], refresh_token: '' }); session = (await supabaseClient.auth.getSession()).data.session; } catch(e) {}
+      }
+    }
+    if (session) {
+      authToken = session.access_token;
+      await initApp();
+    } else {
+      document.getElementById('loginOverlay').classList.remove('hidden');
+      document.getElementById('loginEmail').focus();
+    }
+  } catch (e) {
+    document.getElementById('sidebarHead').textContent = 'Failed to load config.';
+    console.error('Config error:', e);
+  }
+}
+
+async function login() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPass').value;
+  const btn = document.getElementById('loginBtn');
+  const errorEl = document.getElementById('loginError');
+
+  if (!supabaseClient) {
+    errorEl.textContent = 'Still loading…';
+    return;
+  }
+
+  if (!email || !password) {
+    errorEl.textContent = 'Please enter email and password.';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Signing in…';
+  errorEl.textContent = '';
+
+  try {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    authToken = data.session.access_token;
+    // Save session to cookie for remember-me across page loads
+    try { document.cookie = 'lex_token=' + authToken + '; path=/; max-age=604800; SameSite=Lax'; } catch(e) {}
+    document.getElementById('loginOverlay').classList.add('hidden');
+    await initApp();
+  } catch (e) {
+    errorEl.textContent = e.message || 'Sign in failed.';
+  }
+  btn.disabled = false;
+  btn.textContent = 'Sign In';
+}
+
+async function logout() {
+  await supabaseClient.auth.signOut();
+  authToken = null;
+  try { document.cookie = 'lex_token=; path=/; max-age=0; SameSite=Lax'; } catch(e) {}
+  document.getElementById('loginOverlay').classList.remove('hidden');
+  document.getElementById('loginEmail').value = '';
+  document.getElementById('loginPass').value = '';
+  document.getElementById('loginError').textContent = '';
+  document.getElementById('loginEmail').focus();
+}
+
+async function initApp() {
+  try {
+    const [articlesData, profile] = await Promise.all([
+      api('/api/articles', { headers: { Authorization: 'Bearer ' + authToken } }),
+      api('/api/profile', { headers: { Authorization: 'Bearer ' + authToken } }),
+    ]);
+
+    articles = articlesData;
+    xp = profile.totalXP || 0;
+    streak = profile.streak || 0;
+    hearts = profile.hearts || 5;
+
+    updateStatsUI();
+    mode = 'linear';
+    applyMode();
+    setupSpeechRecognition();
+  } catch (e) {
+    document.getElementById('sidebarHead').textContent = 'Failed to load. Check console.';
+    console.error('Init error:', e);
+  }
+}
+
+function updateStatsUI() {
+  document.getElementById('xpCount').textContent = xp.toLocaleString();
+  document.getElementById('streakCount').textContent = streak;
+  document.getElementById('heartsCount').textContent = hearts;
+  const pct = Math.min(100, Math.round((xp % 2000) / 20));
+  document.getElementById('xpBarFill').style.width = pct + '%';
+  document.getElementById('xpBarFill').parentElement.title = xp + ' / ' + (Math.floor(xp / 2000) * 2000 + 2000) + ' XP';
+}
+
+// ─── Sidebar ──────────────────────────────────────────────────
+function renderSidebar() {
+  const list = document.getElementById('sidebarList');
+  const head = document.getElementById('sidebarHead');
+  if (articles.length === 0) {
+    head.textContent = 'No articles';
+    return;
+  }
+
+  const order = modeArticleOrder.length > 0 ? modeArticleOrder : articles.map((_, i) => i);
+  const chapter = articles[0].chapter || 'Articles';
+
+  if (mode === 'selected') {
+    const count = selectedArticles.size;
+    const total = articles.length;
+    head.innerHTML = `${count} / ${total} selected <button class="btn-sm" style="font-size:10px;padding:2px 8px;margin-left:6px" onclick="playSelected()">▶ Play</button>`;
+    list.innerHTML = articles.map((a, idx) => {
+      const active = idx === curArticleIdx ? ' active' : '';
+      const checked = selectedArticles.has(a.id) ? '✓' : '';
+      return `<div class="art-item${active}" onclick="toggleSelected('${a.id}', ${idx})">
+        <span style="min-width:20px;text-align:center;font-size:12px;color:${checked ? 'var(--green)' : 'var(--surface3)'}">${checked || '○'}</span>
+        <span class="art-num">${a.articleNumber}</span>
+        <span class="art-label">${a.title}</span>
+        <span class="art-badge badge-none"></span>
+      </div>`;
+    }).join('');
+  } else if (mode === 'weakspots') {
+    head.textContent = 'Weak spots (' + order.filter(i => !dismissedWeakSpots.has(articles[i].id)).length + ')';
+    list.innerHTML = order.map((idx) => {
+      const a = articles[idx];
+      if (dismissedWeakSpots.has(a.id)) return '';
+      const active = idx === curArticleIdx ? ' active' : '';
+      const score = progressData?.[a.id] ?? null;
+      let badgeCls = 'badge-none', badgeText = '';
+      if (score !== null) {
+        badgeCls = score >= 80 ? 'badge-done' : 'badge-prog';
+        badgeText = score + '%';
+      }
+      return `<div class="art-item${active}" onclick="selectArticle(${idx})">
+        <span class="art-num">${a.articleNumber}</span>
+        <span class="art-label">${a.title}</span>
+        <span class="art-badge ${badgeCls}">${badgeText}</span>
+        ${score !== null ? `<span class="ws-dismiss" onclick="event.stopPropagation();dismissWeakSpot('${a.id}',${idx})" title="Remove from weak spots">✕</span>` : ''}
+      </div>`;
+    }).join('');
+  } else {
+    head.textContent = chapter;
+    list.innerHTML = order.map((idx) => {
+      const a = articles[idx];
+      const active = idx === curArticleIdx ? ' active' : '';
+      return `<div class="art-item${active}" onclick="selectArticle(${idx})">
+        <span class="art-num">${a.articleNumber}</span>
+        <span class="art-label">${a.title}</span>
+        <span class="art-badge badge-none"></span>
+      </div>`;
+    }).join('');
+  }
+}
+
+function toggleSelected(id, idx) {
+  if (selectedArticles.has(id)) selectedArticles.delete(id);
+  else selectedArticles.add(id);
+  if (articles[idx]) selectArticle(idx);
+  renderSidebar();
+}
+
+function playSelected() {
+  if (selectedArticles.size === 0) return;
+  mode = 'selected';
+  modeArticleOrder = articles.map((_, i) => i).filter(i => selectedArticles.has(articles[i].id));
+  if (modeArticleOrder.length > 0) selectArticle(modeArticleOrder[0]);
+}
+
+function selectArticle(idx) {
+  curArticleIdx = idx;
+  const art = articles[idx];
+  if (!art) return;
+
+  // Don't stop listening — let mic keep running for the new article
+  // Just reset transcript and word states
+  resetTranscript();
+  wordStates = tokens.map(() => 'pending');
+
+  document.querySelectorAll('.art-item').forEach((el, i) => {
+    el.classList.toggle('active', i === idx);
+  });
+
+  document.getElementById('articleTitle').textContent = art.title;
+  document.getElementById('artSub').textContent = art.chapter || '';
+  document.getElementById('bestScore').textContent = 'Best: —';
+
+  tokens = art.tokens || [];
+  wordStates = tokens.map(() => 'pending');
+  renderWords();
+  renderCoach();
+  
+  // Restore existing word states via updateWordEl
+  tokens.forEach((_, i) => updateWordEl(i));
+  
+  document.getElementById('transcript').textContent = 'Tap the mic to start reciting…';
+  document.getElementById('transcript').classList.remove('live');
+  document.getElementById('scoreBadge').textContent = '';
+  document.getElementById('progressFill').style.width = '0%';
+  const done = Math.min(3, tokens.length);
+  document.getElementById('progressText').textContent = done + ' / ' + tokens.length + ' words';
+  
+  // Trigger session start message if not listening yet
+  if (!isListening) {
+    speakCoachMessage('sessionStart');
+  }
+}
+
+function selectArticleById(id) {
+  const idx = articles.findIndex(a => a.id === id);
+  if (idx >= 0) selectArticle(idx);
+}
+
+// ─── Speech Recognition ──────────────────────────────────────
+function setupSpeechRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    document.getElementById('micBtn').disabled = true;
+    document.getElementById('transcript').textContent = 'Speech recognition not supported in this browser.';
+    return;
+  }
+  recognition = new SpeechRecognition();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = 'en-US';
+
+  recognition.onresult = function(e) {
+    interimTranscript = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) {
+        finalTranscript += e.results[i][0].transcript + ' ';
+      } else {
+        interimTranscript += e.results[i][0].transcript;
+      }
+    }
+    const display = (finalTranscript + interimTranscript).trim();
+    document.getElementById('transcript').textContent = display || 'Listening…';
+    document.getElementById('transcript').classList.add('live');
+
+    // Silence debounce — score after 1.5s of no speech, then reset for next attempt
+    if (silenceTimer) clearTimeout(silenceTimer);
+    silenceTimer = setTimeout(() => {
+      if (recognitionActive) {
+        const text = finalTranscript.trim();
+        if (text) {
+          submitScore(text);
+          // Reset so user can recite again from wherever they like
+          resetTranscript();
+          const el = document.getElementById('transcript');
+          el.textContent = 'Listening…';
+          el.classList.add('live');
+        }
+      }
+    }, 2000);
+  };
+
+  recognition.onend = function() {
+    if (recognitionActive) {
+      recognitionRestartTimer = setTimeout(() => {
+        try { recognition.start(); } catch(e) {
+          setupSpeechRecognition();
+          try { recognition.start(); } catch(e2) {}
+        }
+      }, 800);
+    }
+  };
+
+  recognition.onerror = function() {
+    if (recognitionActive) {
+      recognitionRestartTimer = setTimeout(() => {
+        try { recognition.start(); } catch(e) {
+          setupSpeechRecognition();
+          try { recognition.start(); } catch(e2) {}
+        }
+      }, 500);
+    }
+  };
+}
+
+function startListening() {
+  setupSpeechRecognition();
+  isListening = true;
+  recognitionActive = true;
+  try { recognition.start(); } catch(e) {}
+  document.getElementById('micBtn').className = 'mic-btn listening';
+  document.getElementById('micBtn').querySelector('i').className = 'ti ti-microphone';
+  document.getElementById('transcript').textContent = 'Listening…';
+  document.getElementById('transcript').classList.add('live');
+}
+
+function stopListening() {
+  isListening = false;
+  recognitionActive = false;
+  if (recognitionRestartTimer) clearTimeout(recognitionRestartTimer);
+  if (silenceTimer) clearTimeout(silenceTimer);
+  try { recognition.abort(); } catch(e) {}
+  recognition = null;
+  document.getElementById('micBtn').className = 'mic-btn stopped';
+  document.getElementById('micBtn').querySelector('i').className = 'ti ti-microphone-off';
+  if (finalTranscript.trim() && tokens.length > 0) {
+    submitScore(finalTranscript.trim());
+  }
+  // Only reset transcript on manual stop
+  resetTranscript();
+}
+
+function resetTranscript() {
+  finalTranscript = '';
+  interimTranscript = '';
+}
+
+function toggleMic() {
+  if (isListening) {
+    stopListening();
+  } else {
+    resetTranscript();
+    startListening();
+  }
+}
+
+// ─── Scoring ──────────────────────────────────────────────────
+async function submitScore(transcript) {
+  const art = articles[curArticleIdx];
+  if (!art || !transcript) return;
+
+  try {
+    const result = await api('/api/score', {
+      method: 'POST',
+      body: JSON.stringify({ transcript, articleId: art.id, currentStates: wordStates }),
+    });
+
+    const newStates = result.scoredWords.map(w => w.status);
+    wordStates = wordStates.map((old, i) => old === 'correct' ? 'correct' : (newStates[i] || old));
+    tokens.forEach((t, i) => {
+      if (wordStates[i]) updateWordEl(i);
+    });
+    updateScore(result);
+    renderCoach();
+  } catch (e) {
+    console.error('Score failed:', e);
+  }
+}
+
+function resetProgress() {
+  wordStates = tokens.map(() => 'pending');
+  tokens.forEach((_, i) => updateWordEl(i));
+  document.getElementById('transcript').textContent = 'Tap the mic to start reciting…';
+  document.getElementById('transcript').classList.remove('live');
+  document.getElementById('scoreBadge').textContent = '';
+  document.getElementById('scoreBadge').className = 'score-badge';
+  document.getElementById('progressFill').style.width = '0%';
+  const doneCount = Math.min(3, tokens.length);
+  document.getElementById('progressText').textContent = doneCount + ' / ' + tokens.length + ' words';
+  setCoachMood('idle');
+  renderCoach();
+  resetTranscript();
+}
+
+function updateScore(score) {
+  if (!score) return;
+  const pct = score.percentCorrect || 0;
+  const badge = document.getElementById('scoreBadge');
+  badge.textContent = pct + '%';
+  badge.className = 'score-badge ' + (pct >= 70 ? 'good' : 'bad');
+
+  const done = wordStates.filter(s => s !== 'pending').length;
+  document.getElementById('progressFill').style.width = Math.round((done / tokens.length) * 100) + '%';
+  document.getElementById('progressText').textContent = done + ' / ' + tokens.length + ' words';
+
+  // Determine coach mood and trigger appropriate animation
+  if (pct >= 90) {
+    triggerCoachState('wave');
+    speakCoachMessage('correct');
+  } else if (pct >= 50) {
+    triggerCoachState('headshake');
+    speakCoachMessage('stumble');
+  } else {
+    triggerCoachState('facepalm');
+    speakCoachMessage('stumble');
+  }
+
+  const earned = Math.floor(pct / 10) * 2;
+  if (earned > 0) {
+    xp += earned;
+    document.getElementById('xpCount').textContent = xp.toLocaleString();
+    const barPct = Math.min(100, Math.round((xp % 2000) / 20));
+    document.getElementById('xpBarFill').style.width = barPct + '%';
+    popXP(earned);
+  }
+  
+  // Track article completion for progress bar
+  trackArticleCompletion(pct);
+  
+  // Check streak milestones for speech
+  if (streak >= 10 && streak % 10 === 0) {
+    triggerCoachState('milestone');
+    speakCoachMessage('streak10');
+  } else if (streak === 5) {
+    triggerCoachState('celebrate');
+    speakCoachMessage('streak5');
+  } else if (streak === 3) {
+    triggerCoachState('wave');
+    speakCoachMessage('streak3');
+  }
+
+  // Auto-advance on perfect score
+  if (pct === 100) {
+    speakCoachMessage('sessionEnd');
+    setTimeout(() => {
+      const order = modeArticleOrder.length > 0 ? modeArticleOrder : articles.map((_, i) => i);
+      const curPos = order.indexOf(curArticleIdx);
+      if (curPos >= 0 && curPos < order.length - 1) {
+        selectArticle(order[curPos + 1]);
+      } else if (curPos === order.length - 1) {
+        // Wrap for random; loop back for linear
+        if (mode === 'random') {
+          applyMode();
+        } else {
+          selectArticle(order[0]);
+        }
+      }
+    }, 1000);
+  }
+}
+
+function popXP(amount) {
+  const pop = document.createElement('div');
+  pop.className = 'xp-pop';
+  pop.textContent = '+' + amount + ' XP';
+  pop.style.cssText = `left:${Math.random()*200+200}px;top:${Math.random()*100+300}px`;
+  document.body.appendChild(pop);
+  setTimeout(() => pop.remove(), 1200);
+}
+
+// ─── Word Rendering ──────────────────────────────────────────
+function renderWords() {
+  const area = document.getElementById('wordArea');
+  if (!tokens || tokens.length === 0) {
+    area.innerHTML = '<p style="color:var(--text-muted);padding:20px">No article loaded.</p>';
+    return;
+  }
+
+  if (curDiff === 4) {
+    area.innerHTML = `<p style="font-family:'Nunito',sans-serif;font-weight:800;font-size:17px;color:var(--text-muted);padding:8px 0;line-height:1.8">Recite from memory.<br><span style="font-size:13px;font-weight:600">${tokens.length} words — you've got this 💪</span></p>`;
+    setCoachMood('blind');
+    return;
+  }
+
+  area.innerHTML = tokens.map((t, i) => {
+    let display = t.raw;
+    if (curDiff === 2) {
+      const isFunc = t.wordType === 'FUNCTION_WORD';
+      display = isFunc ? t.raw : (t.word[0] ? t.word[0].toUpperCase() + '_'.repeat(t.word.length - 1) : t.raw);
+    } else if (curDiff === 3) {
+      display = '_'.repeat(Math.max(t.word.length, 1));
+    }
+    const cls = t.wordType === 'FUNCTION_WORD' ? 'word func-word' : 'word pending';
+    return `<span class="${cls}" id="word-${i}" onclick="clickWord(${i})">${display}</span>`;
+  }).join(' ');
+  setCoachMood('idle');
+}
+
+function clickWord(i) {
+  if (curDiff !== 1) return;
+  const states = ['pending','correct','wrong','missing'];
+  const cur = states.indexOf(wordStates[i]);
+  wordStates[i] = states[(cur + 1) % states.length];
+  updateWordEl(i);
+  const nonFunc = tokens.filter(t => t.wordType !== 'FUNCTION_WORD');
+  const correct = nonFunc.filter((_, idx) => wordStates[tokens.indexOf(nonFunc[idx])] === 'correct').length;
+  const total = nonFunc.length;
+  const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
+  document.getElementById('scoreBadge').textContent = pct + '%';
+  document.getElementById('scoreBadge').className = 'score-badge ' + (pct >= 70 ? 'good' : 'bad');
+  const done = wordStates.filter(s => s !== 'pending').length;
+  document.getElementById('progressFill').style.width = Math.round((done / tokens.length) * 100) + '%';
+  document.getElementById('progressText').textContent = done + ' / ' + tokens.length + ' words';
+}
+
+function updateWordEl(i) {
+  const el = document.getElementById('word-' + i);
+  if (!el) return;
+  const isFunc = tokens[i] && tokens[i].wordType === 'FUNCTION_WORD';
+  el.className = 'word ' + (isFunc ? 'func-word ' : '') + (wordStates[i] || 'pending');
+}
+
+function resetWords() {
+  wordStates = tokens.map(() => 'pending');
+  tokens.forEach((_, i) => updateWordEl(i));
+  document.getElementById('transcript').textContent = 'Tap the mic to start reciting…';
+  document.getElementById('transcript').classList.remove('live');
+  document.getElementById('scoreBadge').textContent = '';
+  document.getElementById('scoreBadge').className = 'score-badge';
+  document.getElementById('progressFill').style.width = '8%';
+  const doneCount = Math.min(3, tokens.length);
+  document.getElementById('progressText').textContent = doneCount + ' / ' + tokens.length + ' words';
+  setCoachMood('idle');
+  renderCoach();
+  resetTranscript();
+}
+
+// ─── Coach ────────────────────────────────────────────────────
+function setCoachMood(mood) {
+  const svg = document.getElementById('coachSvg');
+  const bubble = document.getElementById('coachBubble');
+  svg.className = 'coach-svg-wrap';
+  if (mood === 'cheer') svg.classList.add('coach-cheer');
+  if (mood === 'wrong') svg.classList.add('coach-sad');
+  const msg = COACH_MSGS[mood] || COACH_MSGS.idle;
+  bubble.innerHTML = msg.replace(/<em>(.*?)<\/em>/g, '<em>$1</em>')
+                        .replace(/<bubble-sad>(.*?)<\/bubble-sad>/g, '<span class="bubble-sad">$1</span>');
+}
+
+function toggleHints() {
+  hintsOn = !hintsOn;
+  const btn = document.getElementById('hintToggle');
+  btn.textContent = hintsOn ? 'ON' : 'OFF';
+  btn.className = 'hint-toggle-btn' + (hintsOn ? ' on' : '');
+  renderCoach();
+}
+
+function toggleShowWords() {
+  showWordsInHints = !showWordsInHints;
+  const btn = document.getElementById('showWordsToggle');
+  btn.className = 'hint-toggle-btn' + (showWordsInHints ? ' on' : '');
+  renderCoach();
+}
+
+async function renderCoach() {
+  const body = document.getElementById('coachBody');
+  if (!hintsOn) {
+    body.innerHTML = `<div style="text-align:center;color:var(--text-muted);font-size:13px;padding:28px 0">
+      <div style="font-size:30px;margin-bottom:8px">🙈</div>
+      Hints are off — trust yourself!
+    </div>`;
+    return;
+  }
+  const wrong = tokens.filter((t, i) => wordStates[i] === 'wrong');
+  if (wrong.length === 0) {
+    body.innerHTML = `<div style="text-align:center;color:var(--text-muted);font-size:13px;padding:28px 0">
+      <div style="font-size:30px;margin-bottom:8px">🎙️</div>
+      Recite the article to get coaching hints.
+    </div>`;
+    return;
+  }
+  try {
+    const hintPromises = wrong.slice(0, 3).map(async (t, idx) => {
+      const idxInTokens = tokens.indexOf(t);
+      const context = tokens.slice(Math.max(0, idxInTokens - 3), Math.min(tokens.length, idxInTokens + 4))
+        .map(tt => tt.raw).join(' ');
+      let hintData;
+      try {
+        hintData = await api('/api/hint', {
+          method: 'POST',
+          body: JSON.stringify({
+            word: t.word,
+            context: context,
+            hintType: t.wordType === 'LEGAL_NOUN' ? 'definition' : 'rhyme',
+          }),
+        });
+      } catch {
+        hintData = { hint: `The word starts with "${t.word[0].toUpperCase()}".` };
+      }
+      return { token: t, hint: hintData.hint };
+    });
+    const hints = await Promise.all(hintPromises);
+    body.innerHTML = hints.map(({ token, hint }) => {
+      if (token.wordType === 'LEGAL_NOUN') {
+        // Show tiles: first 2 letters revealed, rest as '?'
+        return `<div class="hint-card">
+          ${showWordsInHints ? `<div class="hint-word">${token.word}</div>` : ''}
+          <div class="spell-tiles">${token.word.split('').map((c, i) =>
+            `<div class="tile ${i < 2 ? 'ok' : ''}">${i < 2 ? c.toUpperCase() : '?'}</div>`
+          ).join('')}</div>
+        </div>`;
+      }
+      return `<div class="hint-card">
+        ${showWordsInHints ? `<div class="hint-word">${token.word}</div>` : ''}
+        <div class="hint-text">${hint}</div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    body.innerHTML = `<div class="hint-card"><div class="hint-text">Hints unavailable.</div></div>`;
+  }
+}
+
+// ─── UI Controls ─────────────────────────────────────────────
+function cycleDifficulty() {
+  curDiff = (curDiff % 4) + 1;
+  document.querySelectorAll('.diff-pill').forEach((p, i) => p.classList.toggle('active', i + 1 === curDiff));
+  renderWords();
+}
+
+function setDiff(el, level) {
+  curDiff = level;
+  document.querySelectorAll('.diff-pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  renderWords();
+  // Restore word states after rendering to prevent difficulty change from resetting progress
+  tokens.forEach((_, i) => updateWordEl(i));
+}
+
+function setMode(el, modeName) {
+  document.querySelectorAll('.mode-tab').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  mode = modeName;
+  applyMode();
+}
+
+function applyMode() {
+  if (mode === 'linear') {
+    modeArticleOrder = articles.map((_, i) => i).sort((a, b) => articles[a].articleNumber - articles[b].articleNumber);
+  } else if (mode === 'random') {
+    shuffledOrder = articles.map((_, i) => i);
+    for (let i = shuffledOrder.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffledOrder[i], shuffledOrder[j]] = [shuffledOrder[j], shuffledOrder[i]];
+    }
+    modeArticleOrder = [...shuffledOrder];
+  } else if (mode === 'weakspots') {
+    loadProgress();
+  } else if (mode === 'selected') {
+    modeArticleOrder = articles.map((_, i) => i).filter(i => selectedArticles.has(articles[i].id));
+    if (modeArticleOrder.length === 0) modeArticleOrder = articles.map((_, i) => i);
+  }
+  renderSidebar();
+  if (modeArticleOrder.length > 0) selectArticle(modeArticleOrder[0]);
+}
+
+async function loadProgress() {
+  try {
+    const data = await api('/api/progress', { headers: { Authorization: 'Bearer ' + authToken } });
+    progressData = {};
+    for (const p of data || []) {
+      progressData[p.articleId] = p.bestScore || 0;
+    }
+    modeArticleOrder = articles.map((_, i) => i).sort((a, b) => {
+      const sa = progressData[articles[a].id] ?? 0;
+      const sb = progressData[articles[b].id] ?? 0;
+      return sa - sb || articles[a].articleNumber - articles[b].articleNumber;
+    });
+    renderSidebar();
+    const first = modeArticleOrder.find(i => !dismissedWeakSpots.has(articles[i].id));
+    if (first !== undefined) selectArticle(first);
+    else if (modeArticleOrder.length > 0) selectArticle(modeArticleOrder[0]);
+  } catch (e) {
+    console.error('Load progress failed:', e);
+  }
+}
+
+function dismissWeakSpot(id, idx) {
+  dismissedWeakSpots.add(id);
+  if (idx === curArticleIdx) {
+    const next = modeArticleOrder.find(i => !dismissedWeakSpots.has(articles[i].id) && i !== idx);
+    if (next !== undefined) selectArticle(next);
+  }
+  renderSidebar();
+}
+
+function showStreak() {
+  document.getElementById('overlay').classList.remove('hidden');
+  document.getElementById('streakPop').classList.remove('hidden');
+  document.getElementById('streakPopNum').textContent = streak;
+}
+
+function closeStreak() {
+  document.getElementById('overlay').classList.add('hidden');
+  document.getElementById('streakPop').classList.add('hidden');
+}
+
+// Blink eyes occasionally
+setInterval(() => {
+  const eL = document.getElementById('eyeL');
+  const eR = document.getElementById('eyeR');
+  if (!eL) return;
+  eL.setAttribute('ry', '1'); eR.setAttribute('ry', '1');
+  setTimeout(() => { eL.setAttribute('ry', '6'); eR.setAttribute('ry', '6'); }, 120);
+}, 3500 + Math.random() * 2000);
+
+// ─── Article Manager ─────────────────────────────────────────
+let parsedArticles = [];
+let editingArticleId = null;
+
+function openUpload() {
+  document.getElementById('uploadOverlay').classList.remove('hidden');
+  switchUploadTab('csv', document.querySelector('.upload-tab'));
+  clearForm();
+  parsedArticles = [];
+  editingArticleId = null;
+}
+
+function closeUpload() {
+  document.getElementById('uploadOverlay').classList.add('hidden');
+}
+
+function switchUploadTab(tab, btn) {
+  document.querySelectorAll('.upload-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.upload-pane').forEach(p => p.classList.add('hidden'));
+  document.getElementById('uploadPane' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.remove('hidden');
+  if (tab === 'manage') loadManageArticles();
+}
+
+// ─── Tab: CSV ───────────────────────────────
+function handleFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    parseCSV(e.target.result);
+    document.getElementById('csvPasteArea').value = e.target.result;
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  document.getElementById('dropZone').classList.add('dragover');
+}
+
+function handleDragLeave(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  document.getElementById('dropZone').classList.remove('dragover');
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  document.getElementById('dropZone').classList.remove('dragover');
+  const files = e.dataTransfer.files;
+  if (files.length > 0 && files[0].name.match(/\.(csv|txt)$/i)) {
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      parseCSV(ev.target.result);
+      document.getElementById('csvPasteArea').value = ev.target.result;
+    };
+    reader.readAsText(files[0]);
+  } else {
+    showCsvResult('Please drop a .csv or .txt file.', false);
+  }
+}
+
+function handleCsvPaste(text) {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    document.getElementById('uploadPreview').style.display = 'none';
+    document.getElementById('confirmUploadBtn').disabled = true;
+    return;
+  }
+  parseCSV(trimmed);
+}
+
+function parseCSV(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  if (lines.length < 2) {
+    showCsvResult('CSV must have a header row and at least one data row.', false);
+    return;
+  }
+  const header = parseCSVLine(lines[0]);
+  const colMap = {};
+  header.forEach((h, i) => colMap[h.toLowerCase().trim()] = i);
+  const required = ['book', 'chapter', 'article_number', 'title', 'content_md'];
+  const missing = required.filter(r => !(r in colMap));
+  if (missing.length > 0) {
+    showCsvResult('Missing columns: ' + missing.join(', ') + '. Required: ' + required.join(', '), false);
+    return;
+  }
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const vals = parseCSVLine(lines[i]);
+    const get = (col) => (vals[colMap[col]] || '').trim();
+    const artNum = parseInt(get('article_number'), 10);
+    rows.push({
+      book: get('book'),
+      chapter: get('chapter'),
+      article_number: isNaN(artNum) ? 0 : artNum,
+      title: get('title'),
+      content_md: get('content_md'),
+    });
+  }
+  parsedArticles = rows;
+  renderPreview(rows);
+}
+
+function parseCSVLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (i + 1 < line.length && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += ch;
+      }
+    } else {
+      if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ',') {
+        result.push(current);
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+  }
+  result.push(current);
+  return result;
+}
+
+function renderPreview(rows) {
+  const valid = rows.filter(r => r.article_number > 0 && r.title && r.content_md);
+  const tbody = document.getElementById('previewBody');
+  tbody.innerHTML = valid.slice(0, 50).map((r, i) =>
+    `<tr>
+      <td class="num">${i + 1}</td>
+      <td class="num">${r.article_number}</td>
+      <td>${escapeHtml(r.title)}</td>
+      <td>${escapeHtml(r.book)} / ${escapeHtml(r.chapter)}</td>
+    </tr>`
+  ).join('');
+  if (valid.length > 50) {
+    tbody.innerHTML += `<tr><td colspan="4" style="color:var(--text-muted);font-style:italic">… and ${rows.length - 50} more</td></tr>`;
+  }
+  document.getElementById('uploadPreview').style.display = 'block';
+  document.getElementById('confirmUploadBtn').disabled = valid.length === 0;
+}
+
+function showCsvResult(msg, ok) {
+  const el = document.getElementById('uploadCsvResult');
+  el.textContent = msg;
+  el.className = 'upload-result ' + (ok ? 'ok' : 'err');
+  el.style.display = 'block';
+}
+
+async function confirmUpload() {
+  const valid = parsedArticles.filter(r => r.article_number > 0 && r.title && r.content_md);
+  if (valid.length === 0) return;
+  const btn = document.getElementById('confirmUploadBtn');
+  btn.disabled = true;
+  btn.textContent = 'Uploading…';
+  try {
+    const result = await api('/api/articles/upload', {
+      method: 'POST',
+      body: JSON.stringify({ articles: valid }),
+    });
+    const msg = result.inserted + ' article(s) uploaded successfully.';
+    if (result.errors && result.errors.length > 0) {
+      showCsvResult(msg + ' ' + result.errors.length + ' error(s): ' + result.errors.map(e => e.reason).join('; '), true);
+    } else {
+      showCsvResult(msg, true);
+    }
+    await reloadArticles();
+  } catch (e) {
+    showCsvResult('Upload failed: ' + e.message, false);
+  }
+  btn.disabled = false;
+  btn.textContent = 'Upload CSV';
+}
+
+// ─── Tab: Add / Edit ─────────────────────────
+function clearForm() {
+  document.getElementById('addBook').value = '';
+  document.getElementById('addChapter').value = '';
+  document.getElementById('addNumber').value = '';
+  document.getElementById('addTitle').value = '';
+  document.getElementById('addContent').value = '';
+  document.getElementById('uploadAddResult').style.display = 'none';
+  editingArticleId = null;
+  document.getElementById('addArticleBtn').textContent = 'Add Article';
+}
+
+function fillForm(article) {
+  document.getElementById('addBook').value = article.book || '';
+  document.getElementById('addChapter').value = article.chapter || '';
+  document.getElementById('addNumber').value = article.articleNumber || article.article_number || '';
+  document.getElementById('addTitle').value = article.title || '';
+  document.getElementById('addContent').value = article.contentMd || article.content_md || '';
+  document.getElementById('uploadAddResult').style.display = 'none';
+}
+
+async function submitArticle() {
+  const book = document.getElementById('addBook').value.trim();
+  const chapter = document.getElementById('addChapter').value.trim();
+  const article_number = parseInt(document.getElementById('addNumber').value, 10);
+  const title = document.getElementById('addTitle').value.trim();
+  const content_md = document.getElementById('addContent').value.trim();
+
+  if (!book || !chapter || !article_number || !title || !content_md) {
+    showAddResult('All fields are required.', false);
+    return;
+  }
+
+  const body = { book, chapter, article_number, title, content_md };
+  const btn = document.getElementById('addArticleBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  try {
+    if (editingArticleId) {
+      await api('/api/articles/' + editingArticleId, { method: 'PATCH', body: JSON.stringify(body) });
+      showAddResult('Article updated successfully.', true);
+    } else {
+      await api('/api/articles/upload', { method: 'POST', body: JSON.stringify({ articles: [body] }) });
+      showAddResult('Article added successfully.', true);
+    }
+    clearForm();
+    await reloadArticles();
+  } catch (e) {
+    showAddResult('Failed: ' + e.message, false);
+  }
+  btn.disabled = false;
+  btn.textContent = editingArticleId ? 'Update Article' : 'Add Article';
+}
+
+function showAddResult(msg, ok) {
+  const el = document.getElementById('uploadAddResult');
+  el.textContent = msg;
+  el.className = 'upload-result ' + (ok ? 'ok' : 'err');
+  el.style.display = 'block';
+}
+
+// ─── Tab: Manage ─────────────────────────────
+async function loadManageArticles() {
+  const list = document.getElementById('mgrList');
+  const count = document.getElementById('mgrCount');
+  count.textContent = 'Loading…';
+  list.innerHTML = '';
+  document.getElementById('uploadMgrResult').style.display = 'none';
+  try {
+    const data = await api('/api/articles', { headers: { Authorization: 'Bearer ' + authToken } });
+    count.textContent = data.length + ' article(s)';
+    if (data.length === 0) {
+      list.innerHTML = '<div class="mgr-empty">No articles yet. Add one via the Add tab or upload a CSV.</div>';
+      return;
+    }
+    list.innerHTML = data.map((a, i) => {
+      const num = a.articleNumber || a.article_number;
+      const title = a.title || '';
+      const sub = (a.book || '') + ' / ' + (a.chapter || '');
+      const id = a.id;
+      return `<div class="mgr-item">
+        <span class="mgr-num">${num}</span>
+        <div class="mgr-info">
+          <div class="mgr-title">${escapeHtml(title)}</div>
+          <div class="mgr-sub">${escapeHtml(sub)}</div>
+        </div>
+        <div class="mgr-actions">
+          <button class="btn-sm" onclick="editArticle('${id}')">✏️ Edit</button>
+          <button class="btn-danger" onclick="deleteArticle('${id}', '${escapeHtml(title).replace(/'/g, "\\'")}')">🗑 Delete</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    count.textContent = 'Failed to load';
+    list.innerHTML = '<div class="mgr-empty">Error loading articles.</div>';
+  }
+}
+
+async function editArticle(id) {
+  try {
+    const article = await api('/api/articles/' + id, { headers: { Authorization: 'Bearer ' + authToken } });
+    fillForm(article);
+    editingArticleId = id;
+    document.getElementById('addArticleBtn').textContent = 'Update Article';
+    // Switch to Add tab
+    const tabs = document.querySelectorAll('.upload-tab');
+    switchUploadTab('add', tabs[1]);
+  } catch (e) {
+    document.getElementById('uploadMgrResult').textContent = 'Failed to load article: ' + e.message;
+    document.getElementById('uploadMgrResult').className = 'upload-result err';
+    document.getElementById('uploadMgrResult').style.display = 'block';
+  }
+}
+
+async function deleteArticle(id, title) {
+  if (!confirm('Delete "' + title + '" permanently?')) return;
+  try {
+    await api('/api/articles/' + id, { method: 'DELETE' });
+    document.getElementById('uploadMgrResult').textContent = 'Deleted successfully.';
+    document.getElementById('uploadMgrResult').className = 'upload-result ok';
+    document.getElementById('uploadMgrResult').style.display = 'block';
+    await reloadArticles();
+    loadManageArticles();
+  } catch (e) {
+    document.getElementById('uploadMgrResult').textContent = 'Delete failed: ' + e.message;
+    document.getElementById('uploadMgrResult').className = 'upload-result err';
+    document.getElementById('uploadMgrResult').style.display = 'block';
+  }
+}
+
+// ─── Shared ──────────────────────────────────
+async function reloadArticles() {
+  if (!authToken) return;
+  try {
+    const articlesData = await api('/api/articles', { headers: { Authorization: 'Bearer ' + authToken } });
+    if (articlesData) {
+      articles = articlesData;
+      renderSidebar();
+      if (articles.length > 0) selectArticleById(articles[0].id);
+    }
+  } catch (e) {
+    console.error('Reload failed:', e);
+  }
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ─── Init on load ────────────────────────────────────────────
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+</script>
+
+<!-- ── ALL DONE MODAL ─────────────────────────────────── -->
+<div id="allDoneModal" class="overlay hidden" style="z-index:1000">
+  <div style="
+    background:var(--surface);
+    border:2.5px solid var(--green);
+    border-radius:var(--radius-xl);
+    padding:40px 36px;
+    text-align:center;
+    max-width:380px;
+    width:90%;
+    position:relative;
+    z-index:1001;
+    animation:pop-in 0.4s cubic-bezier(.34,1.56,.64,1);
+  ">
+    <div style="font-size:52px;margin-bottom:8px">🏆</div>
+    <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:26px;color:var(--green);margin-bottom:8px">
+      You did it!
+    </div>
+    <div style="font-size:14px;color:var(--text-dim);margin-bottom:24px;line-height:1.6">
+      Every article mastered.<br>Case closed, counsel. Outstanding work.
+    </div>
+    <button onclick="restartAll()" style="
+      font-family:'Nunito',sans-serif;font-weight:900;font-size:15px;
+      padding:12px 32px;border-radius:99px;border:none;
+      background:var(--green);color:#fff;cursor:pointer;
+      transition:background 0.12s;width:100%;margin-bottom:10px;
+    ">▶ Start Again</button>
+    <button onclick="document.getElementById('allDoneModal').classList.add('hidden')" style="
+      font-family:'Nunito',sans-serif;font-weight:700;font-size:13px;
+      padding:10px 24px;border-radius:99px;
+      border:1.5px solid var(--border);background:transparent;
+      color:var(--text-dim);cursor:pointer;width:100%;
+    ">Stay here</button>
+  </div>
+</div>
+</body>
+</html>
