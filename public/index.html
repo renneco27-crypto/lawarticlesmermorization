@@ -1894,6 +1894,8 @@ let silenceTimer = null;
 let editingArticleId = null;
 let parsedArticles = [];
 var totalArticleCount = 0;
+var showingPeek = false;
+var tabPeekTimer = null;
 
 // Bind login form events early so they work even if something below crashes
 document.addEventListener('DOMContentLoaded', function() {
@@ -2689,6 +2691,24 @@ function resetTranscript() {
 }
 
 function onKeyDown(e) {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    if (!showingPeek && tokens.length > 0 && (curDiff === 2 || curDiff === 3 || curDiff === 4)) {
+      if (tabPeekTimer) return;
+      tabPeekTimer = setTimeout(function() {
+        showingPeek = true;
+        var area = document.getElementById('wordArea');
+        area.innerHTML = tokens.map(function(t, i) {
+          var cls = t.wordType === 'FUNCTION_WORD' ? 'word func-word' : (wordStates[i] || 'pending');
+          return '<span class="' + cls + '" id="word-' + i + '">' + t.raw + '</span>';
+        }).join(' ');
+        area.querySelectorAll('.word:not(.func-word)').forEach(function(el) {
+          el.style.cursor = 'default';
+        });
+      }, 200);
+    }
+    return;
+  }
   if (e.key === ' ' || e.code === 'Space') {
     if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
     e.preventDefault();
@@ -2697,6 +2717,34 @@ function onKeyDown(e) {
 }
 
 function onKeyUp(e) {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    if (tabPeekTimer) {
+      clearTimeout(tabPeekTimer);
+      tabPeekTimer = null;
+    }
+    if (showingPeek) {
+      showingPeek = false;
+      renderWords();
+      var allDone = wordStates.every(function(s, i) {
+        return tokens[i].wordType === 'FUNCTION_WORD' || s === 'correct';
+      });
+      if (allDone && (curDiff === 2 || curDiff === 3 || curDiff === 4)) {
+        var order = (modeArticleOrder.length > 0 ? modeArticleOrder : articles.map(function(_, i) { return i; })).filter(function(idx){return idx < articles.length});
+        var curPos = order.indexOf(curArticleIdx);
+        if (curPos >= 0 && curPos < order.length - 1) {
+          selectArticle(order[curPos + 1]);
+        } else if (curPos === order.length - 1) {
+          if (mode === 'random') {
+            applyMode();
+          } else {
+            selectArticle(order[0]);
+          }
+        }
+      }
+    }
+    return;
+  }
   if (e.key === ' ' || e.code === 'Space') {
     if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
     e.preventDefault();
@@ -3247,14 +3295,24 @@ function renderWords() {
     let display = t.raw;
     if (curDiff === 2) {
       const isFunc = t.wordType === 'FUNCTION_WORD';
-      display = isFunc ? t.raw : (t.word[0] ? t.word[0].toUpperCase() + '_'.repeat(t.word.length - 1) : t.raw);
       if (isFunc) {
         return `<span class="word func-word" id="word-${i}">${display}</span>`;
       }
-      return `<input class="word pending" id="word-${i}" type="text" value="${display}" size="${t.word.length}" data-word="${t.word}" autocomplete="off" spellcheck="false" onfocus="this.select()" oninput="checkWordInput(${i})" onkeydown="if(event.key==='Enter')this.blur()">`;
+      if (wordStates[i] === 'correct') {
+        display = t.raw;
+      } else {
+        display = t.word[0] ? t.word[0].toUpperCase() + '_'.repeat(t.word.length - 1) : t.raw;
+      }
+      var inputCls = wordStates[i] && wordStates[i] !== 'pending' ? 'word ' + wordStates[i] : 'word pending';
+      return `<input class="${inputCls}" id="word-${i}" type="text" value="${display}" size="${t.word.length}" data-word="${t.word}" autocomplete="off" spellcheck="false" onfocus="this.select()" oninput="checkWordInput(${i})" onkeydown="if(event.key==='Enter')this.blur()">`;
     } else if (curDiff === 3) {
-      display = '_'.repeat(Math.max(t.word.length, 1));
-      return `<input class="word pending" id="word-${i}" type="text" value="${display}" size="${t.word.length}" data-word="${t.word}" autocomplete="off" spellcheck="false" onfocus="this.select()" oninput="checkWordInput(${i})" onkeydown="if(event.key==='Enter')this.blur()">`;
+      if (wordStates[i] === 'correct') {
+        display = t.raw;
+      } else {
+        display = '_'.repeat(Math.max(t.word.length, 1));
+      }
+      var inputCls = wordStates[i] && wordStates[i] !== 'pending' ? 'word ' + wordStates[i] : 'word pending';
+      return `<input class="${inputCls}" id="word-${i}" type="text" value="${display}" size="${t.word.length}" data-word="${t.word}" autocomplete="off" spellcheck="false" onfocus="this.select()" oninput="checkWordInput(${i})" onkeydown="if(event.key==='Enter')this.blur()">`;
     }
     const cls = t.wordType === 'FUNCTION_WORD' ? 'word func-word' : 'word pending';
     return `<span class="${cls}" id="word-${i}" onclick="clickWord(${i})">${display}</span>`;
