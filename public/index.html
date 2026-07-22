@@ -2943,22 +2943,26 @@ function updateScore(score) {
   // Auto-advance on perfect score
   if (pct === 100) {
     speakCoachMessage('sessionEnd');
-    // Reset to A__ mode before advancing to next article
-    setDiff(document.querySelector('.diff-pills .diff-pill:nth-child(2)'), 2);
-    setTimeout(() => {
-      const order = modeArticleOrder.length > 0 ? modeArticleOrder : articles.map((_, i) => i);
-      const curPos = order.indexOf(curArticleIdx);
-      if (curPos >= 0 && curPos < order.length - 1) {
-        selectArticle(order[curPos + 1]);
-      } else if (curPos === order.length - 1) {
-        // Wrap for random; loop back for linear
-        if (mode === 'random') {
-          applyMode();
-        } else {
-          selectArticle(order[0]);
+    if (curDiff === 1) {
+      // Full → stay on same article, switch to A__
+      setDiff(document.querySelector('.diff-pills .diff-pill:nth-child(2)'), 2);
+    } else if (curDiff === 2) {
+      // A__ → switch to Full, then advance to next article
+      setDiff(document.querySelector('.diff-pills .diff-pill:nth-child(1)'), 1);
+      setTimeout(() => {
+        const order = modeArticleOrder.length > 0 ? modeArticleOrder : articles.map((_, i) => i);
+        const curPos = order.indexOf(curArticleIdx);
+        if (curPos >= 0 && curPos < order.length - 1) {
+          selectArticle(order[curPos + 1]);
+        } else if (curPos === order.length - 1) {
+          if (mode === 'random') {
+            applyMode();
+          } else {
+            selectArticle(order[0]);
+          }
         }
-      }
-    }, 1000);
+      }, 1000);
+    }
   }
 }
 
