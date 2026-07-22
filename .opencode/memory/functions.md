@@ -1,0 +1,5 @@
+# SYSTEM FUNCTION REGISTRY
+
+<-- AUTO-MAINTAINED BY OPENCODE -->
+
+## Core Functions & Utilities
