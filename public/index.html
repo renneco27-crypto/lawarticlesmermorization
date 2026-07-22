@@ -2943,6 +2943,8 @@ function updateScore(score) {
   // Auto-advance on perfect score
   if (pct === 100) {
     speakCoachMessage('sessionEnd');
+    // Reset to A__ mode before advancing to next article
+    setDiff(document.querySelector('.diff-pills .diff-pill:nth-child(2)'), 2);
     setTimeout(() => {
       const order = modeArticleOrder.length > 0 ? modeArticleOrder : articles.map((_, i) => i);
       const curPos = order.indexOf(curArticleIdx);
