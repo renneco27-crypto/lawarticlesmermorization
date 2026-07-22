@@ -413,49 +413,43 @@ export async function scoreAttempt(
   }))
 
   const WINDOW = 5
-  let pendingIndices = target
-    .map((_, i) => i)
-    .filter((i) => scoredWords[i].status === 'pending')
 
-  // Pass 1: match spoken words to pending tokens (non-sequential, any order)
+  // Pass 1: sequential cursor scan
+  // Each spoken word looks ahead WINDOW tokens from cursor; if matched, advance past it.
+  // If none match, mark first pending token at cursor as wrong and advance past it.
+  let cursor = target.findIndex((_, i) => scoredWords[i].status === 'pending')
+  if (cursor < 0) cursor = 0
+
   for (const spokenWord of spokenWords) {
+    if (cursor >= target.length) break
     let matchIdx = -1
-    const searchSpace = pendingIndices.slice(0, WINDOW)
-    for (const tokenIdx of searchSpace) {
-      const token = target[tokenIdx]
+    for (let look = 0; look < WINDOW && cursor + look < target.length; look++) {
+      const idx = cursor + look
+      if (scoredWords[idx].status !== 'pending') continue
+      const token = target[idx]
       const normalizedToken = normalizeNumbers(token.word)
       const targetNorm = normalizeWord(normalizedToken)
       const isMatch = await phoneticMatch(spokenWord, targetNorm)
       if (isMatch) {
-        matchIdx = tokenIdx
+        matchIdx = idx
         break
       }
     }
     if (matchIdx >= 0) {
       scoredWords[matchIdx].status = 'correct'
       scoredWords[matchIdx].spokenAs = spokenWord
-      pendingIndices = pendingIndices.filter((i) => i !== matchIdx)
-    }
-  }
-
-  // Pass 2: infer wrong from short gaps of consecutive pending tokens
-  // These are tokens the user likely passed over but didn't say correctly
-  let gapStart = -1
-  for (let i = 0; i <= target.length; i++) {
-    const isPending = i < target.length && scoredWords[i].status === 'pending'
-    if (isPending && gapStart === -1) {
-      gapStart = i
-    }
-    if (!isPending && gapStart !== -1) {
-      const gapLen = i - gapStart
-      if (gapLen <= WINDOW) {
-        for (let j = gapStart; j < i; j++) {
-          if (scoredWords[j].wordType !== 'FUNCTION_WORD') {
-            scoredWords[j].status = 'wrong'
-          }
+      cursor = matchIdx + 1
+    } else {
+      // Mark first pending token at cursor as wrong and advance
+      const firstPending = target.findIndex((_, i) => i >= cursor && scoredWords[i].status === 'pending')
+      if (firstPending >= 0) {
+        if (scoredWords[firstPending].wordType !== 'FUNCTION_WORD') {
+          scoredWords[firstPending].status = 'wrong'
+        } else {
+          scoredWords[firstPending].status = 'correct'
         }
+        cursor = firstPending + 1
       }
-      gapStart = -1
     }
   }
 
