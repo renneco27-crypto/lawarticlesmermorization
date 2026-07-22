@@ -4135,21 +4135,27 @@ function escapeHtml(str) {
 }
 
 // ─── Read Aloud Feature ──────────────────────────────────
+// Reads the article directly over the word area (no modal, no per-word highlight),
+// using the same TTS engine/voice-picking/coach-mouth-animation as the coach's speak().
 let readAloudState = {
   isPlaying: false,
   isPaused: false,
-  utterance: null,
-  words: [],
-  currentWordIndex: 0,
-  highlightedSpans: []
+  utterance: null
 };
 
 function toggleReadAloud() {
-  const modal = document.getElementById('readAloudModal');
-  if (modal.classList.contains('hidden')) {
-    startReadAloud();
+  if (readAloudState.isPlaying && !readAloudState.isPaused) {
+    // Pause
+    speechSynthesis.pause();
+    readAloudState.isPaused = true;
+    document.getElementById('readAloudBtn').classList.remove('playing');
+  } else if (readAloudState.isPaused) {
+    // Resume
+    speechSynthesis.resume();
+    readAloudState.isPaused = false;
+    document.getElementById('readAloudBtn').classList.add('playing');
   } else {
-    stopReadAloud();
+    startReadAloud();
   }
 }
 
@@ -4167,167 +4173,87 @@ function startReadAloud() {
     return;
   }
 
-  // Open modal
-  const modal = document.getElementById('readAloudModal');
-  modal.classList.remove('hidden');
-  
-  // Render content with spans for each word
-  const contentDiv = document.getElementById('readAloudContent');
-  readAloudState.words = content.split(/\s+/).filter(w => w.length > 0);
-  contentDiv.innerHTML = readAloudState.words.map((word, idx) => 
-    `<span id="read-word-${idx}" style="transition:all 0.2s;cursor:default;">${escapeHtml(word)}</span> `
-  ).join('');
-  
-  readAloudState.currentWordIndex = 0;
-  readAloudState.highlightedSpans = [];
-  readAloudState.isPlaying = true;
-  readAloudState.isPaused = false;
-  
-  // Update button
-  document.getElementById('playPauseBtn').textContent = '⏸ Pause';
-  document.getElementById('readAloudBtn').classList.add('playing');
-  
-  // Use Web Speech API to read aloud
-  if ('speechSynthesis' in window) {
-    // Cancel any previous speech
-    speechSynthesis.cancel();
-    
-    const utterance = new SpeechSynthesisUtterance(content);
-    utterance.rate = 0.9; // Slower speech for clarity
-    utterance.pitch = 1;
-    utterance.volume = 1;
-    
-    // Track which word is currently being spoken
-    // Since we can't easily track individual words, we'll estimate based on word count and time
-    const wordsPerSecond = 3; // Rough estimate for reading speed
-    const totalWords = readAloudState.words.length;
-    const estimatedDuration = (totalWords / wordsPerSecond) * 1000;
-    
-    let startTime = null;
-    const highlightInterval = setInterval(() => {
-      if (!readAloudState.isPlaying && !readAloudState.isPaused) {
-        clearInterval(highlightInterval);
-        return;
-      }
-      
-      if (readAloudState.isPaused) return;
-      
-      if (!startTime) startTime = Date.now();
-      const elapsed = Date.now() - startTime;
-      const progress = Math.min(elapsed / estimatedDuration, 1);
-      const newIndex = Math.floor(progress * totalWords);
-      
-      // Update highlighting
-      if (newIndex !== readAloudState.currentWordIndex) {
-        // Remove highlight from previous word
-        if (readAloudState.currentWordIndex > 0) {
-          const prevSpan = document.getElementById(`read-word-${readAloudState.currentWordIndex - 1}`);
-          if (prevSpan) {
-            prevSpan.style.backgroundColor = '';
-            prevSpan.style.color = 'var(--text)';
-          }
-        }
-        
-        // Highlight current word
-        readAloudState.currentWordIndex = newIndex;
-        if (newIndex < totalWords) {
-          const span = document.getElementById(`read-word-${newIndex}`);
-          if (span) {
-            span.style.backgroundColor = 'var(--blue)';
-            span.style.color = '#fff';
-            span.style.padding = '2px 4px';
-            span.style.borderRadius = '3px';
-          }
-          
-          const progress = Math.round((newIndex / totalWords) * 100);
-          document.getElementById('readProgress').textContent = `Reading... ${progress}% (${newIndex + 1} / ${totalWords} words)`;
-        }
-      }
-    }, 100);
-    
-    utterance.onend = () => {
-      clearInterval(highlightInterval);
-      readAloudState.isPlaying = false;
-      document.getElementById('playPauseBtn').textContent = '▶ Replay';
-      document.getElementById('readAloudBtn').classList.remove('playing');
-      document.getElementById('readProgress').textContent = 'Finished!';
-      
-      // Clear final highlight
-      const lastSpan = document.getElementById(`read-word-${readAloudState.currentWordIndex}`);
-      if (lastSpan) {
-        lastSpan.style.backgroundColor = '';
-        lastSpan.style.color = 'var(--text)';
-      }
-    };
-    
-    utterance.onerror = (event) => {
-      console.error('Speech synthesis error:', event);
-      document.getElementById('readProgress').textContent = 'Error during reading';
-    };
-    
-    readAloudState.utterance = utterance;
-    speechSynthesis.speak(utterance);
-  } else {
+  if (!('speechSynthesis' in window)) {
     alert('Speech synthesis not supported in your browser');
-    stopReadAloud();
-  }
-}
-
-function toggleReadPlayPause() {
-  if (!readAloudState.isPlaying && !readAloudState.isPaused) {
-    startReadAloud();
     return;
   }
-  
-  if (readAloudState.isPaused) {
-    // Resume
-    speechSynthesis.resume();
+
+  // Stop any previous speech (coach chatter or a prior read-aloud)
+  window.speechSynthesis.cancel();
+
+  const utterance = new SpeechSynthesisUtterance(content);
+  utterance.lang = 'en-US'; // hard-lock to English regardless of system locale, same as coach speak()
+  utterance.rate = 0.95;
+  utterance.pitch = 1.0;
+  utterance.volume = 1;
+
+  // Animate the coach's mouth while reading, same as coach speak()
+  const coachSvg = document.getElementById('coachSvg');
+  utterance.onstart = () => {
+    if (coachSvg) coachSvg.classList.add('coach-speaking');
+  };
+  utterance.onend = utterance.onerror = () => {
+    if (coachSvg) coachSvg.classList.remove('coach-speaking');
+    readAloudState.isPlaying = false;
     readAloudState.isPaused = false;
-    document.getElementById('playPauseBtn').textContent = '⏸ Pause';
-    document.getElementById('readAloudBtn').classList.add('playing');
-  } else if (readAloudState.isPlaying) {
-    // Pause
-    speechSynthesis.pause();
-    readAloudState.isPaused = true;
-    document.getElementById('playPauseBtn').textContent = '▶ Resume';
     document.getElementById('readAloudBtn').classList.remove('playing');
+  };
+
+  readAloudState.utterance = utterance;
+  readAloudState.isPlaying = true;
+  readAloudState.isPaused = false;
+  document.getElementById('readAloudBtn').classList.add('playing');
+
+  // Voices may not be loaded yet — wait if needed, same pattern as coach speak()
+  const trySpeak = () => {
+    const voice = getBestVoice();
+    if (voice) utterance.voice = voice;
+    try { window.speechSynthesis.speak(utterance); } catch (e) { console.error('TTS error:', e); }
+  };
+
+  const voices = window.speechSynthesis.getVoices();
+  if (voices && voices.length > 0) {
+    trySpeak();
+  } else {
+    window.speechSynthesis.onvoiceschanged = () => { trySpeak(); window.speechSynthesis.onvoiceschanged = null; };
   }
 }
 
 function stopReadAloud() {
-  // Stop speech synthesis
   if (speechSynthesis) {
     speechSynthesis.cancel();
   }
-  
-  // Clear highlighting
-  const contentDiv = document.getElementById('readAloudContent');
-  const allSpans = contentDiv.querySelectorAll('span[id^="read-word-"]');
-  allSpans.forEach(span => {
-    span.style.backgroundColor = '';
-    span.style.color = 'var(--text)';
-    span.style.padding = '';
-    span.style.borderRadius = '';
-  });
-  
-  // Reset state
+
+  const coachSvg = document.getElementById('coachSvg');
+  if (coachSvg) coachSvg.classList.remove('coach-speaking');
+
   readAloudState.isPlaying = false;
   readAloudState.isPaused = false;
-  readAloudState.currentWordIndex = 0;
-  
-  // Close modal
-  document.getElementById('readAloudModal').classList.add('hidden');
   document.getElementById('readAloudBtn').classList.remove('playing');
-  document.getElementById('playPauseBtn').textContent = '▶ Play';
 }
 
 // ─── Article Read Aloud (Neural Network TTS) ──────────────────────────────────
 let articleReadAloudState = {
   isPlaying: false,
   isPaused: false,
-  currentWordIndex: 0,
   utterance: null
 };
+
+function wrapArticleWordsInSpans() {
+  const contentDiv = document.getElementById('articleReadAloudContent');
+  if (!contentDiv || contentDiv.dataset.wrapped) return;
+  
+  const text = contentDiv.innerText;
+  const words = text.split(/\s+/);
+  let html = '';
+  
+  words.forEach((word, index) => {
+    html += `<span id="article-read-word-${index}" style="display:inline; padding: 2px 4px;">${word}</span>`;
+  });
+  
+  contentDiv.innerHTML = html.trim();
+  contentDiv.dataset.wrapped = 'true';
+}
 
 function startArticleReadAloud() {
   const contentDiv = document.getElementById('articleReadAloudContent');
@@ -4335,6 +4261,9 @@ function startArticleReadAloud() {
     alert('No content to read');
     return;
   }
+  
+  // Wrap words in spans if not already done
+  wrapArticleWordsInSpans();
   
   const text = contentDiv.innerText;
   
@@ -4346,60 +4275,20 @@ function startArticleReadAloud() {
     
     articleReadAloudState.isPlaying = true;
     articleReadAloudState.isPaused = false;
+    
     const btn = document.getElementById('articleReadAloudBtn');
     if (btn) btn.classList.add('playing');
     const playBtn = document.getElementById('articlePlayPauseBtn');
     if (playBtn) playBtn.textContent = '⏸ Pause';
     const progress = document.getElementById('articleReadProgress');
-    if (progress) progress.textContent = 'Starting...';
-    
-    const words = text.split(/\s+/);
-    const totalWords = words.length;
+    if (progress) progress.textContent = 'Reading...';
     
     utterance.onstart = () => {
       const progress = document.getElementById('articleReadProgress');
-      if (progress) progress.textContent = `Reading... 0% (0 / ${totalWords} words)`;
+      if (progress) progress.textContent = 'Reading...';
     };
     
-    // Track word progress
-    let highlightInterval = setInterval(() => {
-      if (!articleReadAloudState.isPlaying) return;
-      
-      const charIndex = Math.floor(utterance.position || 0);
-      const textUpToCursor = text.substring(0, charIndex);
-      const newIndex = textUpToCursor.split(/\s+/).length - 1;
-      
-      // Update highlighting
-      if (newIndex !== articleReadAloudState.currentWordIndex) {
-        // Remove highlight from previous word
-        if (articleReadAloudState.currentWordIndex > 0) {
-          const prevSpan = document.getElementById(`article-read-word-${articleReadAloudState.currentWordIndex - 1}`);
-          if (prevSpan) {
-            prevSpan.style.backgroundColor = '';
-            prevSpan.style.color = 'var(--text)';
-          }
-        }
-        
-        // Highlight current word
-        articleReadAloudState.currentWordIndex = newIndex;
-        if (newIndex < totalWords) {
-          const span = document.getElementById(`article-read-word-${newIndex}`);
-          if (span) {
-            span.style.backgroundColor = 'var(--blue)';
-            span.style.color = '#fff';
-            span.style.padding = '2px 4px';
-            span.style.borderRadius = '3px';
-          }
-          
-          const progress = Math.round((newIndex / totalWords) * 100);
-          const progressEl = document.getElementById('articleReadProgress');
-          if (progressEl) progressEl.textContent = `Reading... ${progress}% (${newIndex + 1} / ${totalWords} words)`;
-        }
-      }
-    }, 100);
-    
     utterance.onend = () => {
-      clearInterval(highlightInterval);
       articleReadAloudState.isPlaying = false;
       const playBtn = document.getElementById('articlePlayPauseBtn');
       if (playBtn) playBtn.textContent = '▶ Replay';
@@ -4407,13 +4296,6 @@ function startArticleReadAloud() {
       if (btn) btn.classList.remove('playing');
       const progress = document.getElementById('articleReadProgress');
       if (progress) progress.textContent = 'Finished!';
-      
-      // Clear final highlight
-      const lastSpan = document.getElementById(`article-read-word-${articleReadAloudState.currentWordIndex}`);
-      if (lastSpan) {
-        lastSpan.style.backgroundColor = '';
-        lastSpan.style.color = 'var(--text)';
-      }
     };
     
     utterance.onerror = (event) => {
@@ -4461,22 +4343,9 @@ function stopArticleReadAloud() {
     speechSynthesis.cancel();
   }
   
-  // Clear highlighting
-  const contentDiv = document.getElementById('articleReadAloudContent');
-  if (contentDiv) {
-    const allSpans = contentDiv.querySelectorAll('span[id^="article-read-word-"]');
-    allSpans.forEach(span => {
-      span.style.backgroundColor = '';
-      span.style.color = 'var(--text)';
-      span.style.padding = '';
-      span.style.borderRadius = '';
-    });
-  }
-  
   // Reset state
   articleReadAloudState.isPlaying = false;
   articleReadAloudState.isPaused = false;
-  articleReadAloudState.currentWordIndex = 0;
   
   // Close modal
   const modal = document.getElementById('articleReadAloudModal');
@@ -4567,76 +4436,6 @@ if (document.readyState === 'loading') {
   </div>
 </div>
 
-<!-- ── READ ALOUD MODAL ─────────────────────────────────── -->
-<div id="readAloudModal" class="overlay hidden" style="z-index:999">
-  <div style="
-    background:var(--surface);
-    border:2.5px solid var(--blue);
-    border-radius:var(--radius-xl);
-    padding:30px;
-    max-width:600px;
-    width:90%;
-    max-height:70vh;
-    overflow-y:auto;
-    position:relative;
-    z-index:1001;
-    animation:pop-in 0.3s cubic-bezier(.34,1.56,.64,1);
-  ">
-    <!-- Header -->
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:10px;">
-      <div>
-        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:18px;color:var(--blue);margin-bottom:4px;">
-          Reading Aloud
-        </div>
-        <div style="font-size:12px;color:var(--text-muted);">Words are highlighted as they're spoken</div>
-      </div>
-      <button onclick="stopReadAloud()" style="
-        font-family:'Nunito',sans-serif;font-weight:800;font-size:20px;
-        background:transparent;border:none;color:var(--text-dim);
-        cursor:pointer;padding:5px;transition:color 0.12s;
-      " onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-dim)'">×</button>
-    </div>
-
-    <!-- Content to read -->
-    <div id="readAloudContent" style="
-      font-family:'Inter',sans-serif;
-      font-size:14px;
-      line-height:1.8;
-      color:var(--text);
-      word-wrap:break-word;
-      padding:15px;
-      background:var(--surface2);
-      border-radius:var(--radius);
-      border:1.5px solid var(--border);
-      min-height:200px;
-      margin-bottom:15px;
-    "></div>
-
-    <!-- Controls -->
-    <div style="display:flex;gap:10px;margin-top:15px;">
-      <button id="playPauseBtn" onclick="toggleReadPlayPause()" style="
-        flex:1;
-        font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;
-        padding:10px 16px;border-radius:var(--radius-sm);
-        border:1.5px solid var(--blue);background:var(--blue);
-        color:#fff;cursor:pointer;transition:background 0.12s;
-      ">⏸ Pause</button>
-      <button onclick="stopReadAloud()" style="
-        flex:1;
-        font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;
-        padding:10px 16px;border-radius:var(--radius-sm);
-        border:1.5px solid var(--border);background:transparent;
-        color:var(--text-dim);cursor:pointer;transition:all 0.12s;
-      ">⏹ Close</button>
-    </div>
-
-    <!-- Progress -->
-    <div style="margin-top:12px;font-size:11px;color:var(--text-muted);text-align:center;">
-      <span id="readProgress">Ready to read</span>
-    </div>
-  </div>
-</div>
-
 <!-- ── ARTICLE READ ALOUD MODAL ─────────────────────────────────── -->
 <div id="articleReadAloudModal" class="overlay hidden" style="z-index:999">
   <div style="
@@ -4658,7 +4457,7 @@ if (document.readyState === 'loading') {
         <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:18px;color:var(--green);margin-bottom:4px;">
           Reading Article
         </div>
-        <div style="font-size:12px;color:var(--text-muted);">Words are highlighted as they're spoken</div>
+        <div style="font-size:12px;color:var(--text-muted);">Listen to the article</div>
       </div>
       <button onclick="stopArticleReadAloud()" style="
         font-family:'Nunito',sans-serif;font-weight:800;font-size:20px;
