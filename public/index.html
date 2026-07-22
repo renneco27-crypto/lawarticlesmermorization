@@ -1244,10 +1244,10 @@
 
     <!-- controls -->
     <div class="controls">
-      <button class="mic-btn" id="micBtn" onclick="toggleMic()">
-        <i class="ti ti-microphone"></i>
+      <button class="mic-btn" id="micBtn" onmousedown="startPushToTalk()" onmouseup="stopPushToTalk()" onmouseleave="stopPushToTalk()">
+        <i class="ti ti-microphone-off"></i>
       </button>
-      <div class="transcript" id="transcript">Tap the mic to start reciting…</div>
+      <div class="transcript" id="transcript">Hold spacebar or click mic to recite</div>
       <div class="score-badge" id="scoreBadge"></div>
     </div>
   </div>
@@ -2056,6 +2056,8 @@ async function initApp() {
     mode = 'linear';
     applyMode();
     setupSpeechRecognition();
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('keyup', onKeyUp);
   } catch (e) {
     document.getElementById('sidebarHead').textContent = 'Failed to load. Check console.';
     console.error('Init error:', e);
@@ -2328,13 +2330,30 @@ function resetTranscript() {
   interimTranscript = '';
 }
 
-function toggleMic() {
-  if (isListening) {
-    stopListening();
-  } else {
-    resetTranscript();
-    startListening();
+function onKeyDown(e) {
+  if (e.key === ' ' || e.code === 'Space') {
+    e.preventDefault();
+    if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
+    startPushToTalk();
   }
+}
+
+function onKeyUp(e) {
+  if (e.key === ' ' || e.code === 'Space') {
+    e.preventDefault();
+    stopPushToTalk();
+  }
+}
+
+function startPushToTalk() {
+  if (isListening) return;
+  resetTranscript();
+  startListening();
+}
+
+function stopPushToTalk() {
+  if (!isListening) return;
+  stopListening();
 }
 
 // ─── Scoring ──────────────────────────────────────────────────
