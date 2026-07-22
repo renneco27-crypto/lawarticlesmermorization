@@ -2434,8 +2434,9 @@ function stopListening() {
   recognition = null;
   document.getElementById('micBtn').className = 'mic-btn stopped';
   document.getElementById('micBtn').querySelector('i').className = 'ti ti-microphone-off';
-  if (finalTranscript.trim() && tokens.length > 0) {
-    submitScore(finalTranscript.trim());
+  var transcriptToSubmit = finalTranscript.trim() || interimTranscript.trim();
+  if (transcriptToSubmit && tokens.length > 0) {
+    submitScore(transcriptToSubmit);
   }
   resetTranscript();
   document.getElementById('transcript').textContent = 'Hold spacebar or click mic to recite';
