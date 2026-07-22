@@ -1756,7 +1756,7 @@ function restartAll() {
 }
 
 async function resetAllProgress() {
-  if (!confirm('Reset all progress? Your XP, streak, hearts, and article scores will be cleared.')) return;
+  document.getElementById('allDoneModal').classList.add('hidden');
   try {
     await api('/api/profile/reset', { method: 'POST', headers: { Authorization: 'Bearer ' + authToken } });
   } catch (e) { console.error('Reset backend failed:', e); }
@@ -2552,6 +2552,13 @@ function updateScore(score) {
     const barPct = Math.min(100, Math.round((xp % 2000) / 20));
     document.getElementById('xpBarFill').style.width = barPct + '%';
     popXP(earned);
+  }
+  
+  // Update streak when score >= 70%
+  if (pct >= 70) {
+    api('/api/streak', { method: 'POST', headers: { Authorization: 'Bearer ' + authToken } })
+      .then(d => { if (d) { streak = d.streak; document.getElementById('streakCount').textContent = streak; } })
+      .catch(e => console.error('Streak update failed:', e));
   }
   
   // Track article completion for progress bar
