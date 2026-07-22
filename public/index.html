@@ -203,6 +203,20 @@
     color: var(--text-muted);
     padding: 0 14px 10px;
   }
+  .sidebar-book-row {
+    display:flex;align-items:center;gap:4px;padding:0 10px 2px 14px;
+  }
+  .book-select {
+    flex:1;font-size:11px;padding:3px 5px;border:1px solid var(--border);
+    border-radius:5px;background:var(--surface3);color:var(--text);
+    font-family:'Inter',sans-serif;cursor:pointer;
+  }
+  .book-select:focus { outline:none;border-color:var(--green); }
+  .book-mgr-btn {
+    font-size:13px;padding:1px 5px;border:none;background:none;
+    color:var(--text-dim);cursor:pointer;border-radius:4px;line-height:1;
+  }
+  .book-mgr-btn:hover { background:var(--surface3);color:var(--text); }
   .art-item {
     display: flex;
     align-items: center;
@@ -214,6 +228,7 @@
     position: relative;
   }
   .art-item:hover { background: var(--surface2); }
+  .art-item:hover .art-del { opacity:1; }
   .art-item.active {
     border-left-color: var(--green);
     background: rgba(88,204,2,0.08);
@@ -248,6 +263,8 @@
   .badge-none   { background: var(--surface3); }
   .badge-check  { background: var(--green); color: #fff; font-size: 12px; }
   .badge-cross  { background: var(--red); color: #fff; font-size: 12px; }
+  .art-del { font-size:10px;color:var(--red);opacity:0;transition:opacity 0.12s;cursor:pointer;padding:2px 4px;border-radius:3px;margin-left:2px; }
+  .art-del:hover { background:var(--red);color:#fff; }
   .ws-dismiss {
     width: 18px; height: 18px;
     border-radius: 50%;
@@ -1140,6 +1157,19 @@
     color: #fff;
     cursor: pointer;
   }
+  .book-mgr-modal { background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-lg);padding:24px;max-width:400px;width:90%;position:relative;z-index:1001;max-height:80vh;overflow-y:auto; }
+  .book-mgr-head { font-family:'Nunito',sans-serif;font-weight:900;font-size:15px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center; }
+  .book-mgr-row { display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border); }
+  .book-mgr-row:last-child { border-bottom:none; }
+  .book-mgr-row .name { flex:1;font-size:13px; }
+  .book-mgr-row .count { font-size:11px;color:var(--text-dim);margin-right:6px; }
+  .book-mgr-row button { font-size:12px;padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface3);color:var(--text);cursor:pointer; }
+  .book-mgr-row button:hover { background:var(--border); }
+  .book-mgr-row .del-btn { color:var(--red);border-color:var(--red); }
+  .book-mgr-row .del-btn:hover { background:var(--red);color:#fff; }
+  .book-mgr-add { display:flex;gap:6px;margin-top:12px; }
+  .book-mgr-add input { flex:1;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface3);color:var(--text); }
+  .book-mgr-add button { font-size:12px;padding:6px 14px; }
   .overlay {
     position: fixed;
     inset: 0;
@@ -1210,6 +1240,10 @@
 
   <!-- SIDEBAR -->
   <div class="sidebar" id="sidebar">
+    <div class="sidebar-book-row">
+      <select class="book-select" id="bookSelect" onchange="switchBook(this.value)"></select>
+      <button class="book-mgr-btn" onclick="toggleBookMgr()" title="Manage books">⚙</button>
+    </div>
     <div class="sidebar-head" id="sidebarHead">Loading articles…</div>
     <div id="sidebarList"></div>
   </div>
@@ -1599,6 +1633,8 @@ let curArticleIdx = 0;
 let curDiff = 1;
 let isListening = false;
 let recognitionActive = false;
+let books = [];
+let currentBookId = null;
 let mode = 'linear';
 let shuffledOrder = [];
 let selectedArticles = new Set();
@@ -2097,6 +2133,14 @@ async function initApp() {
       progressData[id] = Math.max(existing, entry.bestScore || 0);
     }
 
+    // Fetch books and set default
+    await fetchBooks();
+    if (books.length > 0) {
+      currentBookId = books[0].id;
+      renderBookSelect();
+      await reloadArticles(currentBookId);
+    }
+
     updateStatsUI();
     mode = 'linear';
     applyMode();
@@ -2206,6 +2250,7 @@ function renderSidebar() {
         <span class="art-num">${a.articleNumber}</span>
         <span class="art-label">${a.title}</span>
         <span class="art-badge ${badgeCls}">${badgeText}</span>
+        <span class="art-del" onclick="event.stopPropagation();deleteArticle('${a.id}',${a.articleNumber})" title="Delete this article">✕</span>
       </div>`;
     }).join('');
   }
@@ -2920,7 +2965,7 @@ function openUpload() {
 
 function closeUpload() {
   document.getElementById('uploadOverlay').classList.add('hidden');
-  reloadArticles();
+  reloadArticles(currentBookId);
 }
 
 function switchUploadTab(tab, btn) {
@@ -3073,13 +3118,14 @@ function showCsvResult(msg, ok) {
 async function confirmUpload() {
   const valid = parsedArticles.filter(r => r.article_number > 0 && r.title && r.content_md);
   if (valid.length === 0) return;
+  if (!currentBookId) { showCsvResult('No book selected.', false); return; }
   const btn = document.getElementById('confirmUploadBtn');
   btn.disabled = true;
   btn.textContent = 'Uploading…';
   try {
     const result = await api('/api/articles/upload', {
       method: 'POST',
-      body: JSON.stringify({ articles: valid }),
+      body: JSON.stringify({ bookId: currentBookId, articles: valid }),
     });
     const msg = result.inserted + ' article(s) uploaded successfully.';
     if (result.errors && result.errors.length > 0) {
@@ -3087,7 +3133,7 @@ async function confirmUpload() {
     } else {
       showCsvResult(msg, true);
     }
-    await reloadArticles();
+    await reloadArticles(currentBookId);
   } catch (e) {
     showCsvResult('Upload failed: ' + e.message, false);
   }
@@ -3117,32 +3163,33 @@ function fillForm(article) {
 }
 
 async function submitArticle() {
-  const book = document.getElementById('addBook').value.trim();
   const chapter = document.getElementById('addChapter').value.trim();
   const article_number = parseInt(document.getElementById('addNumber').value, 10);
   const title = document.getElementById('addTitle').value.trim();
   const content_md = document.getElementById('addContent').value.trim();
 
-  if (!book || !chapter || !article_number || !title || !content_md) {
-    showAddResult('All fields are required.', false);
+  if (!chapter || !article_number || !title || !content_md) {
+    showAddResult('Chapter, article number, title, and content are required.', false);
     return;
   }
 
-  const body = { book, chapter, article_number, title, content_md };
+  if (!currentBookId) { showAddResult('No book selected.', false); return; }
+
+  const body = { bookId: currentBookId, articles: [{ chapter, article_number, title, content_md }] };
   const btn = document.getElementById('addArticleBtn');
   btn.disabled = true;
   btn.textContent = 'Saving…';
 
   try {
     if (editingArticleId) {
-      await api('/api/articles/' + editingArticleId, { method: 'PATCH', body: JSON.stringify(body) });
+      await api('/api/articles/' + editingArticleId, { method: 'PATCH', body: JSON.stringify({ chapter, article_number, title, content_md }) });
       showAddResult('Article updated successfully.', true);
     } else {
-      await api('/api/articles/upload', { method: 'POST', body: JSON.stringify({ articles: [body] }) });
+      await api('/api/articles/upload', { method: 'POST', body: JSON.stringify(body) });
       showAddResult('Article added successfully.', true);
     }
     clearForm();
-    await reloadArticles();
+    await reloadArticles(currentBookId);
   } catch (e) {
     showAddResult('Failed: ' + e.message, false);
   }
@@ -3227,10 +3274,12 @@ async function deleteArticle(id, title) {
 }
 
 // ─── Shared ──────────────────────────────────
-async function reloadArticles() {
+async function reloadArticles(bookId) {
   if (!authToken) return;
+  const bid = bookId || currentBookId;
+  const url = bid ? '/api/articles?book_id=' + bid : '/api/articles';
   try {
-    const articlesData = await api('/api/articles', { headers: { Authorization: 'Bearer ' + authToken } });
+    const articlesData = await api(url, { headers: { Authorization: 'Bearer ' + authToken } });
     if (articlesData) {
       const currentId = articles[curArticleIdx]?.id;
       articles = articlesData;
@@ -3243,6 +3292,106 @@ async function reloadArticles() {
   } catch (e) {
     console.error('Reload failed:', e);
   }
+}
+
+// ─── Book Management ──────────────────────────────────
+async function fetchBooks() {
+  try { const d = await api('/api/books'); books = d || []; } catch(e) { console.error('Fetch books failed:', e); }
+}
+
+function renderBookSelect() {
+  const sel = document.getElementById('bookSelect');
+  if (!sel) return;
+  sel.innerHTML = books.map(b => '<option value="' + b.id + '"' + (b.id === currentBookId ? ' selected' : '') + '>' + escapeHtml(b.name) + '</option>').join('');
+}
+
+async function switchBook(bookId) {
+  if (bookId === currentBookId) return;
+  currentBookId = bookId;
+  renderBookSelect();
+  await reloadArticles(currentBookId);
+  renderSidebar();
+}
+
+function toggleBookMgr() {
+  const modal = document.getElementById('bookMgrModal');
+  if (modal.classList.contains('hidden')) { openBookMgr(); } else { closeBookMgr(); }
+}
+
+function openBookMgr() {
+  document.getElementById('bookMgrModal').classList.remove('hidden');
+  renderBookMgr();
+}
+
+function closeBookMgr() {
+  document.getElementById('bookMgrModal').classList.add('hidden');
+}
+
+async function renderBookMgr() {
+  if (books.length === 0) await fetchBooks();
+  const list = document.getElementById('bookMgrList');
+  if (!list) return;
+  list.innerHTML = books.map(b => {
+    const count = articles.filter(a => a.bookId === b.id).length;
+    return '<div class="book-mgr-row">' +
+      '<span class="name">' + escapeHtml(b.name) + '</span>' +
+      '<span class="count">' + count + ' arts</span>' +
+      '<button onclick="renameBook(\'' + b.id + '\')">✏️</button>' +
+      '<button class="del-btn" onclick="deleteBook(\'' + b.id + '\',\'' + escapeHtml(b.name) + '\')">🗑️</button>' +
+    '</div>';
+  }).join('');
+}
+
+async function createBook() {
+  const input = document.getElementById('bookMgrNewName');
+  const name = input.value.trim();
+  if (!name) return;
+  try {
+    const d = await api('/api/books', { method: 'POST', body: JSON.stringify({ name }), headers: { Authorization: 'Bearer ' + authToken } });
+    input.value = '';
+    await fetchBooks();
+    renderBookMgr();
+    if (!currentBookId && books.length > 0) {
+      currentBookId = books[0].id;
+      renderBookSelect();
+      await reloadArticles(currentBookId);
+    }
+  } catch(e) { console.error('Create book failed:', e); }
+}
+
+async function renameBook(bookId) {
+  const b = books.find(x => x.id === bookId);
+  if (!b) return;
+  const name = prompt('Rename "' + b.name + '" to:', b.name);
+  if (!name || name.trim() === b.name) return;
+  try {
+    await api('/api/books/' + bookId, { method: 'PATCH', body: JSON.stringify({ name: name.trim() }), headers: { Authorization: 'Bearer ' + authToken } });
+    await fetchBooks();
+    renderBookSelect();
+    renderBookMgr();
+    renderSidebar();
+  } catch(e) { console.error('Rename book failed:', e); }
+}
+
+async function deleteBook(bookId, name) {
+  if (!confirm('Delete "' + name + '" and all its articles?')) return;
+  try {
+    await api('/api/books/' + bookId, { method: 'DELETE', headers: { Authorization: 'Bearer ' + authToken } });
+    await fetchBooks();
+    if (currentBookId === bookId) currentBookId = books.length > 0 ? books[0].id : null;
+    renderBookSelect();
+    renderBookMgr();
+    await reloadArticles(currentBookId);
+  } catch(e) { console.error('Delete book failed:', e); }
+}
+
+// ─── Article Delete ────────────────────────────────────
+async function deleteArticle(articleId, articleNum) {
+  if (!confirm('Delete Article ' + articleNum + '?')) return;
+  try {
+    await api('/api/articles/' + articleId, { method: 'DELETE', headers: { Authorization: 'Bearer ' + authToken } });
+    await reloadArticles(currentBookId);
+  } catch(e) { console.error('Delete article failed:', e); }
 }
 
 function escapeHtml(str) {
@@ -3258,6 +3407,21 @@ if (document.readyState === 'loading') {
   init();
 }
 </script>
+
+<!-- ── BOOK MANAGER MODAL ──────────────────────── -->
+<div id="bookMgrModal" class="overlay hidden" style="z-index:1000;display:flex;align-items:center;justify-content:center">
+  <div class="book-mgr-modal">
+    <div class="book-mgr-head">
+      <span>Manage Books</span>
+      <button onclick="closeBookMgr()" style="font-size:18px;border:none;background:none;cursor:pointer;color:var(--text-dim)">&times;</button>
+    </div>
+    <div id="bookMgrList"></div>
+    <div class="book-mgr-add">
+      <input id="bookMgrNewName" placeholder="New book name" onkeydown="if(event.key==='Enter')createBook()">
+      <button class="btn-primary" onclick="createBook()" style="padding:6px 14px;font-size:12px">Add</button>
+    </div>
+  </div>
+</div>
 
 <!-- ── ALL DONE MODAL ─────────────────────────────────── -->
 <div id="allDoneModal" class="overlay hidden" style="z-index:1000">

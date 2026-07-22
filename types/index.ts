@@ -17,6 +17,8 @@ export type WordToken = {
 export type Article = {
   id: string
   book: string          // 'Book 1'
+  bookId: string        // UUID from lex_books
+  bookName: string      // book name from lex_books
   chapter: string       // 'Chapter 1 — Effect and Application of Laws'
   articleNumber: number // 1, 2, 3…
   title: string         // 'Article 1'
