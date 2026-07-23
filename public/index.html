@@ -3415,10 +3415,13 @@ function renderWords() {
 
   area.innerHTML = tokens.map((t, i) => {
     let display = t.raw;
+    // Numbered list item — prepend a line break so 1. 2. 3. each start on their own line
+    const isListMarker = /^\d+\.$/.test(t.raw);
+    const lineBreak = (isListMarker && i > 0) ? '<br>' : '';
     if (curDiff === 2) {
       const isFunc = t.wordType === 'FUNCTION_WORD';
       if (isFunc) {
-        return `<span class="word func-word" id="word-${i}">${display}</span>`;
+        return `${lineBreak}<span class="word func-word" id="word-${i}">${display}</span>`;
       }
       if (wordStates[i] === 'correct') {
         display = t.raw;
@@ -3426,7 +3429,7 @@ function renderWords() {
         display = t.word[0] ? t.word[0].toUpperCase() + '_'.repeat(t.word.length - 1) : t.raw;
       }
       var inputCls = wordStates[i] && wordStates[i] !== 'pending' ? 'word ' + wordStates[i] : 'word pending';
-      return `<input class="${inputCls}" id="word-${i}" type="text" value="${display}" size="${t.word.length}" data-word="${t.word}" autocomplete="off" spellcheck="false" onfocus="this.select()" oninput="checkWordInput(${i})" onkeydown="if(event.key==='Enter')this.blur()">`;
+      return `${lineBreak}<input class="${inputCls}" id="word-${i}" type="text" value="${display}" size="${t.word.length}" data-word="${t.word}" autocomplete="off" spellcheck="false" onfocus="this.select()" oninput="checkWordInput(${i})" onkeydown="if(event.key==='Enter')this.blur()">`;
     } else if (curDiff === 3) {
       if (wordStates[i] === 'correct') {
         display = t.raw;
@@ -3434,10 +3437,10 @@ function renderWords() {
         display = '_'.repeat(Math.max(t.word.length, 1));
       }
       var inputCls = wordStates[i] && wordStates[i] !== 'pending' ? 'word ' + wordStates[i] : 'word pending';
-      return `<input class="${inputCls}" id="word-${i}" type="text" value="${display}" size="${t.word.length}" data-word="${t.word}" autocomplete="off" spellcheck="false" onfocus="this.select()" oninput="checkWordInput(${i})" onkeydown="if(event.key==='Enter')this.blur()">`;
+      return `${lineBreak}<input class="${inputCls}" id="word-${i}" type="text" value="${display}" size="${t.word.length}" data-word="${t.word}" autocomplete="off" spellcheck="false" onfocus="this.select()" oninput="checkWordInput(${i})" onkeydown="if(event.key==='Enter')this.blur()">`;
     }
     const cls = t.wordType === 'FUNCTION_WORD' ? 'word func-word' : 'word pending';
-    return `<span class="${cls}" id="word-${i}" onclick="clickWord(${i})">${display}</span>`;
+    return `${lineBreak}<span class="${cls}" id="word-${i}" onclick="clickWord(${i})">${display}</span>`;
   }).join(' ');
   setCoachMood('idle');
 }
@@ -3839,24 +3842,67 @@ function handleCsvPaste(text) {
 }
 
 function parseCSV(text) {
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-  if (lines.length < 2) {
-    showCsvResult('CSV must have a header row and at least one data row.', false);
-    return;
-  }
-  const header = parseCSVLine(lines[0]);
-  const colMap = {};
-  header.forEach((h, i) => colMap[h.toLowerCase().trim()] = i);
-  const required = ['chapter', 'article_number', 'title', 'content_md'];
-  const missing = required.filter(r => !(r in colMap));
-  if (missing.length > 0) {
-    showCsvResult('Missing columns: ' + missing.join(', ') + '. Required: ' + required.join(', '), false);
-    return;
-  }
+  // Normalize line endings
+  text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  // Tokenize the entire CSV respecting quoted multi-line cells
   const rows = [];
-  for (let i = 1; i < lines.length; i++) {
-    const vals = parseCSVLine(lines[i]);
-    const get = (col) => (vals[colMap[col]] || '').trim();
+  let i = 0;
+  let isFirstRow = true;
+  let header = null;
+  const colMap = {};
+
+  while (i < text.length) {
+    // Skip blank lines between rows
+    if (text[i] === '\n') { i++; continue; }
+
+    // Parse one row
+    const cells = [];
+    while (i < text.length && text[i] !== '\n') {
+      let cell = '';
+      if (text[i] === '"') {
+        i++; // opening quote
+        while (i < text.length) {
+          if (text[i] === '"') {
+            if (i + 1 < text.length && text[i + 1] === '"') {
+              cell += '"'; i += 2; // escaped quote
+            } else {
+              i++; break; // closing quote
+            }
+          } else {
+            cell += text[i++];
+          }
+        }
+      } else {
+        while (i < text.length && text[i] !== ',' && text[i] !== '\n') {
+          cell += text[i++];
+        }
+      }
+      cells.push(cell.trim());
+      if (i < text.length && text[i] === ',') i++; // skip comma
+    }
+    if (i < text.length && text[i] === '\n') i++; // skip row-ending newline
+
+    if (cells.every(c => c === '')) continue; // skip blank rows
+
+    if (isFirstRow) {
+      isFirstRow = false;
+      header = cells;
+      header.forEach((h, idx) => colMap[h.toLowerCase().trim()] = idx);
+      const required = ['chapter', 'article_number', 'title', 'content_md'];
+      const missing = required.filter(r => !(r in colMap));
+      if (missing.length > 0) {
+        showCsvResult('Missing columns: ' + missing.join(', ') + '. Required: ' + required.join(', '), false);
+        return;
+      }
+      continue;
+    }
+
+    const get = (col) => {
+      const val = (cells[colMap[col]] || '').trim();
+      // Support literal \n escape sequences written in the CSV as a fallback
+      return val.replace(/\\n/g, '\n');
+    };
     const artNum = parseInt(get('article_number'), 10);
     rows.push({
       chapter: get('chapter'),
@@ -3864,6 +3910,11 @@ function parseCSV(text) {
       title: get('title'),
       content_md: get('content_md'),
     });
+  }
+
+  if (rows.length === 0) {
+    showCsvResult('CSV must have a header row and at least one data row.', false);
+    return;
   }
   parsedArticles = rows;
   renderPreview(rows);
@@ -4194,12 +4245,28 @@ async function deleteBook(bookId, name) {
   try {
     await api('/api/books/' + bookId, { method: 'DELETE', headers: { Authorization: 'Bearer ' + authToken } });
     await fetchBooks();
-    if (currentBookId === bookId) currentBookId = books.length > 0 ? books[0].id : null;
+    // Update currentBookId after the books list is refreshed
+    if (currentBookId === bookId) {
+      currentBookId = books.length > 0 ? books[0].id : null;
+    }
     renderBookSelect();
     renderUploadBookSelect();
     renderAddBookSelect();
-    await reloadArticles(currentBookId);
-    loadManageArticles();
+    if (books.length === 0) {
+      // No books left — wipe everything so nothing is cached on screen
+      articles = [];
+      tokens = [];
+      wordStates = [];
+      curArticleIdx = -1;
+      renderSidebar();
+      clearArticleDisplay();
+      const area = document.getElementById('wordArea');
+      if (area) area.innerHTML = '';
+      loadManageArticles();
+    } else {
+      await reloadArticles(currentBookId);
+      loadManageArticles();
+    }
   } catch(e) { console.error('Delete book failed:', e); }
 }
 
