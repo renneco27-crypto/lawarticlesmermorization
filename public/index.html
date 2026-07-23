@@ -1792,6 +1792,11 @@
 
     <!-- Hints -->
     <div class="coach-body" id="coachBody"></div>
+
+    <!-- Static tab nudge -->
+    <div style="padding:8px 14px 10px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);opacity:0.8;user-select:none;">
+      // hold <kbd style="font-family:inherit;background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:0 4px;">tab</kbd> to peek answers
+    </div>
   </div>
 
 </div>
@@ -2295,11 +2300,36 @@ function speak(text, rate = 1.0) {
   }
 }
 
+// ─── Shuffle-queue TTS: exhaust every line before repeating ──────
+// Queue per pool is persisted in localStorage so it survives page reloads.
+const _coachQueues = {};
+
+function _getCoachQueue(pool, total) {
+  if (!_coachQueues[pool]) {
+    try {
+      const saved = localStorage.getItem('coachQ_' + pool);
+      _coachQueues[pool] = saved ? JSON.parse(saved) : [];
+    } catch(e) { _coachQueues[pool] = []; }
+  }
+  // Refill with a fresh Fisher-Yates shuffle when empty
+  if (_coachQueues[pool].length === 0) {
+    const idx = Array.from({length: total}, (_, i) => i);
+    for (let i = idx.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [idx[i], idx[j]] = [idx[j], idx[i]];
+    }
+    _coachQueues[pool] = idx;
+  }
+  return _coachQueues[pool];
+}
+
 function speakCoachMessage(pool) {
   const messages = COACH_SPEECH_POOLS[pool] || [];
   if (messages.length === 0) return;
-  const msg = messages[Math.floor(Math.random() * messages.length)];
-  speak(msg);
+  const queue = _getCoachQueue(pool, messages.length);
+  const pick = queue.shift();
+  try { localStorage.setItem('coachQ_' + pool, JSON.stringify(queue)); } catch(e) {}
+  speak(messages[pick]);
 }
 
 // Speak from the first wrong/missing word onward (or repeat the whole sentence if needed)
@@ -2732,16 +2762,27 @@ function onKeyDown(e) {
     e.preventDefault();
     if (!showingPeek && tokens.length > 0 && (curDiff === 2 || curDiff === 3 || curDiff === 4)) {
       if (tabPeekTimer) return;
+      // Remember which input was focused and its cursor position before peek replaces the DOM
+      var focusedBefore = document.activeElement;
+      var focusId = (focusedBefore && focusedBefore.id) ? focusedBefore.id : null;
+      var selStart = focusedBefore && focusedBefore.selectionStart !== undefined ? focusedBefore.selectionStart : null;
+      // Clear only the currently focused input so user gets a blank slate on their current box
+      if (focusedBefore && focusedBefore.tagName === 'INPUT' && focusedBefore.classList.contains('word')) {
+        focusedBefore.value = '';
+      }
       tabPeekTimer = setTimeout(function() {
         showingPeek = true;
+        showingPeekFocusId = focusId;
+        showingPeekSelStart = selStart;
         var area = document.getElementById('wordArea');
         area.innerHTML = tokens.map(function(t, i) {
-          var cls = t.wordType === 'FUNCTION_WORD' ? 'word func-word' : (wordStates[i] || 'pending');
-          return '<span class="' + cls + '" id="word-' + i + '">' + t.raw + '</span>';
+          if (curDiff === 2 && t.wordType === 'FUNCTION_WORD') {
+            return '<span class="word func-word" id="word-' + i + '">' + t.raw + '</span>';
+          }
+          var state = wordStates[i] || 'pending';
+          var inputCls = (state !== 'pending') ? 'word ' + state : 'word correct';
+          return '<input class="' + inputCls + '" id="word-' + i + '" type="text" value="' + t.word.replace(/"/g, '&quot;') + '" size="' + t.word.length + '" readonly tabindex="-1" autocomplete="off" spellcheck="false">';
         }).join(' ');
-        area.querySelectorAll('.word:not(.func-word)').forEach(function(el) {
-          el.style.cursor = 'default';
-        });
       }, 200);
     }
     return;
@@ -2753,6 +2794,9 @@ function onKeyDown(e) {
   }
 }
 
+var showingPeekFocusId = null;
+var showingPeekSelStart = null;
+
 function onKeyUp(e) {
   if (e.key === 'Tab') {
     e.preventDefault();
@@ -2763,6 +2807,16 @@ function onKeyUp(e) {
     if (showingPeek) {
       showingPeek = false;
       renderWords();
+      // Restore focus to the input that was active before the peek
+      if (showingPeekFocusId) {
+        var el = document.getElementById(showingPeekFocusId);
+        if (el) {
+          el.value = ''; // wipe the A__ / C___ placeholder that renderWords just put back
+          el.focus();
+        }
+        showingPeekFocusId = null;
+        showingPeekSelStart = null;
+      }
       var allDone = wordStates.every(function(s, i) {
         return tokens[i].wordType === 'FUNCTION_WORD' || s === 'correct';
       });
@@ -3175,11 +3229,38 @@ async function submitScore(transcript) {
   try {
     const result = await scoreAttempt(transcript, tokens, wordStates);
     const newStates = result.scoredWords.map(w => w.status);
-    wordStates = wordStates.map((old, i) => old === 'correct' ? 'correct' : (newStates[i] || old));
-    tokens.forEach((t, i) => {
-      if (wordStates[i]) updateWordEl(i);
+
+    // ─── Trim trailing wrong words beyond where the user stopped ───
+    // Find the last keyword index that was actually matched in this attempt.
+    // Everything after that which scored 'wrong' was never reached → keep as pending.
+    let lastMatchedIdx = -1;
+    for (let i = 0; i < result.scoredWords.length; i++) {
+      if (result.scoredWords[i].status === 'correct' && tokens[i].wordType !== 'FUNCTION_WORD') {
+        lastMatchedIdx = i;
+      }
+    }
+
+    wordStates = wordStates.map((old, i) => {
+      if (old === 'correct') return 'correct'; // never regress a green
+      const scored = newStates[i];
+      if (scored === 'wrong' && i > lastMatchedIdx) return 'pending'; // user never got here
+      return scored || old;
     });
-    updateScore(result);
+
+    tokens.forEach((t, i) => { if (wordStates[i]) updateWordEl(i); });
+
+    // ─── Coach reacts to this attempt's window only, not the whole article ───
+    // Only judge words the scorer actually evaluated (up to and including lastMatchedIdx).
+    const attemptCorrect = result.scoredWords.filter((w, i) =>
+      i <= lastMatchedIdx && w.status === 'correct' && tokens[i].wordType !== 'FUNCTION_WORD'
+    ).length;
+    const attemptWrong = result.scoredWords.filter((w, i) =>
+      i <= lastMatchedIdx && w.status === 'wrong' && tokens[i].wordType !== 'FUNCTION_WORD'
+    ).length;
+    const attemptTotal = attemptCorrect + attemptWrong;
+    const attemptPct = attemptTotal > 0 ? Math.round(attemptCorrect / attemptTotal * 100) : 100;
+
+    updateScore(result, attemptPct);
     renderCoach();
   } catch (e) {
     console.error('Score failed:', e);
@@ -3201,9 +3282,12 @@ function resetProgress() {
   resetTranscript();
 }
 
-function updateScore(score) {
+function updateScore(score, attemptPct) {
   if (!score) return;
   const pct = score.percentCorrect || 0;
+  // attemptPct = accuracy of just what the user actually said this turn.
+  // Falls back to pct if not provided (e.g. called from other paths).
+  const coachPct = (attemptPct !== undefined) ? attemptPct : pct;
   const badge = document.getElementById('scoreBadge');
   badge.textContent = pct + '%';
   badge.className = 'score-badge ' + (pct >= 70 ? 'good' : 'bad');
@@ -3212,11 +3296,12 @@ function updateScore(score) {
   document.getElementById('progressFill').style.width = Math.round((done / tokens.length) * 100) + '%';
   document.getElementById('progressText').textContent = done + ' / ' + tokens.length + ' words';
 
-  // Determine coach mood and trigger appropriate animation
-  if (pct >= 90) {
+  // ─── Coach reacts to the accuracy of what you actually said this turn ───
+  // coachPct only counts the window you spoke, so partial recitations are judged fairly.
+  if (coachPct >= 90) {
     triggerCoachState('wave');
     speakCoachMessage('correct');
-  } else if (pct >= 50) {
+  } else if (coachPct >= 50) {
     triggerCoachState('headshake');
     speakCoachMessage('stumble');
   } else {
