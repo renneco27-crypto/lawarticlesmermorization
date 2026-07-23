@@ -2776,15 +2776,21 @@ function onKeyDown(e) {
         showingPeekSelStart = selStart;
         var area = document.getElementById('wordArea');
         area.innerHTML = tokens.map(function(t, i) {
+          var lb = (i > 0 && /^\d+\.$/.test(t.raw)) ? '<br>' : '';
           if (curDiff === 2 && t.wordType === 'FUNCTION_WORD') {
-            return '<span class="word func-word" id="word-' + i + '">' + t.raw + '</span>';
+            return lb + '<span class="word func-word" id="word-' + i + '">' + t.raw + '</span>';
           }
           var state = wordStates[i] || 'pending';
           var inputCls = (state !== 'pending') ? 'word ' + state : 'word correct';
-          return '<input class="' + inputCls + '" id="word-' + i + '" type="text" value="' + t.word.replace(/"/g, '&quot;') + '" size="' + t.word.length + '" readonly tabindex="-1" autocomplete="off" spellcheck="false">';
+          return lb + '<input class="' + inputCls + '" id="word-' + i + '" type="text" value="' + t.word.replace(/"/g, '&quot;') + '" size="' + t.word.length + '" readonly tabindex="-1" autocomplete="off" spellcheck="false">';
         }).join(' ');
       }, 200);
     }
+    return;
+  }
+  if (e.key === '`' || e.code === 'Backquote') {
+    e.preventDefault();
+    setDiff(document.querySelector('.diff-pills .diff-pill:nth-child(2)'), 2);
     return;
   }
   if (e.key === ' ' || e.code === 'Space') {
