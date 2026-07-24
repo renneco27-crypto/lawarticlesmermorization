@@ -314,7 +314,7 @@ body {
     <div id="uploadPaneGenerate" class="upload-pane hidden">
       <div class="upload-book-row">
         <label class="field-label" style="margin-bottom:0;">Upload to book:</label>
-        <select class="upload-book-select" id="genBookSelect" onchange="currentBookId=this.value;renderBookSelect()"></select>
+        <select class="upload-book-select" id="genBookSelect" onchange="currentBookId=this.value;renderBookSelect();updateGenStartNum()"></select>
         <button class="btn-sm" onclick="createBookFromUpload()">+ New</button>
       </div>
       <textarea class="field-textarea" id="genInput" style="min-height:160px;" placeholder="Paste statute/constitution text here..."></textarea>
@@ -498,7 +498,7 @@ function switchUploadTab(tab, btn) {
   document.querySelectorAll('.upload-pane').forEach(p => p.classList.add('hidden'))
   document.getElementById('uploadPane' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.remove('hidden')
   if (tab === 'manage') loadManageArticles()
-  if (tab === 'generate') renderGenBookSelect()
+  if (tab === 'generate') { renderGenBookSelect(); updateGenStartNum() }
 }
 
 // ─── CSV Tab ─────────────────────────────────
@@ -811,6 +811,15 @@ function renderGenBookSelect() {
   const sel = document.getElementById('genBookSelect')
   if (!sel) return
   sel.innerHTML = books.map(b => '<option value="' + b.id + '"' + (b.id === currentBookId ? ' selected' : '') + '>' + escapeHtml(b.name) + '</option>').join('')
+}
+
+async function updateGenStartNum() {
+  if (!currentBookId) return
+  try {
+    const data = await api('/api/articles?book_id=' + currentBookId)
+    const max = (data||[]).reduce((m, a) => Math.max(m, a.articleNumber||a.article_number||0), 0)
+    document.getElementById('genStartNum').value = max + 1
+  } catch(e) {}
 }
 
 const ROMAN_MAP = {i:1,ii:2,iii:3,iv:4,v:5,vi:6,vii:7,viii:8,ix:9,x:10,xi:11,xii:12,xiii:13,xiv:14,xv:15,xvi:16,xvii:17,xviii:18,xix:19,xx:20}
