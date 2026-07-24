@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { getUserFromRequest, getSupabaseClient } from '@/lib/supabaseAdmin'
 
 interface ArticleRow {
   chapter: string
@@ -9,10 +9,10 @@ interface ArticleRow {
 }
 
 export async function POST(request: NextRequest) {
+  console.log('[upload] POST hit')
   try {
-    const auth = request.headers.get('Authorization')
-    if (!auth?.startsWith('Bearer ')) return NextResponse.json({ error: 'Missing auth token' }, { status: 401 })
-    const token = auth.slice(7)
+    await getUserFromRequest(request)
+    console.log('[upload] auth OK')
 
     let body: { bookId?: string; articles: ArticleRow[] }
     try { body = await request.json() } catch { return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 }) }
@@ -37,29 +37,36 @@ export async function POST(request: NextRequest) {
 
     if (valid.length === 0) return NextResponse.json({ inserted: 0, errors }, { status: 400 })
 
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    if (!url || !anonKey) return NextResponse.json({ error: 'Server config error' }, { status: 500 })
+    // Deduplicate by article_number within this batch — last row wins
+    const deduped = Object.values(
+      valid.reduce((acc, r) => {
+        acc[r.article_number] = r
+        return acc
+      }, {} as Record<number, ArticleRow>)
+    )
+    const dupesStripped = valid.length - deduped.length
 
-    const supabase = createClient(url, anonKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-      global: { headers: { Authorization: `Bearer ${token}` } },
-    })
+    // Use the service role client — bypasses RLS cleanly, no token state to degrade
+    const supabase = getSupabaseClient()
 
-    const { data, error } = await supabase.from('lex_articles').insert(
-      valid.map(r => ({
+    const { data, error } = await supabase.from('lex_articles').upsert(
+      deduped.map(r => ({
         book_id: body.bookId,
         book: '',
         chapter: r.chapter,
         article_number: r.article_number,
         title: r.title,
         content_md: r.content_md,
-      }))
+      })),
+      { onConflict: 'book_id,article_number', ignoreDuplicates: false }
     ).select('id')
 
-    if (error) return NextResponse.json({ inserted: 0, errors: [{ row: -1, reason: error.message }] }, { status: 500 })
+    if (error) {
+      console.error('[upload] Supabase error:', JSON.stringify(error, null, 2))
+      return NextResponse.json({ inserted: 0, errors: [{ row: -1, reason: error.message }] }, { status: 500 })
+    }
 
-    return NextResponse.json({ inserted: data.length, errors })
+    return NextResponse.json({ inserted: data.length, errors, dupesStripped })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Upload failed'
     return NextResponse.json({ error: message }, { status: 500 })

@@ -209,7 +209,7 @@ body {
   <div class="login-card">
     <div class="login-logo">Lex <span>Memoria</span></div>
     <div class="login-sub">Admin — Article Manager</div>
-    <input class="login-field" id="adminPass" type="password" placeholder="Admin password" autocomplete="off">
+    <input class="login-field" id="adminPass" type="password" placeholder="Admin password" autocomplete="off" oninput="saveAdminPass()">
     <button class="login-btn" id="adminLoginBtn" onclick="adminLogin()">Sign In</button>
     <div class="login-error" id="adminLoginError"></div>
   </div>
@@ -368,6 +368,8 @@ async function init() {
       } else {
         document.getElementById('supaOverlay').classList.add('hidden')
         document.getElementById('adminOverlay').classList.remove('hidden')
+        const savedPass = localStorage.getItem('saved_admin_pass')
+        if (savedPass) { document.getElementById('adminPass').value = savedPass }
         document.getElementById('adminPass').focus()
       }
     } else {
@@ -406,6 +408,10 @@ async function supaLogin() {
 }
 
 // ─── Admin Auth ──────────────────────────────
+function saveAdminPass() {
+  localStorage.setItem('saved_admin_pass', document.getElementById('adminPass').value)
+}
+
 async function adminLogin() {
   const pass = document.getElementById('adminPass').value
   const btn = document.getElementById('adminLoginBtn')
@@ -439,6 +445,7 @@ function fullLogout() {
   authToken = null
   try { document.cookie = 'lex_token=; path=/; max-age=0; SameSite=Lax' } catch(e) {}
   localStorage.removeItem('csv_admin')
+  localStorage.removeItem('saved_admin_pass')
   location.reload()
 }
 

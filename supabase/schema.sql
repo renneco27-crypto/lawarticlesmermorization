@@ -21,7 +21,7 @@ CREATE TABLE lex_articles (
   title           TEXT NOT NULL,          -- 'Article 1'
   content_md      TEXT NOT NULL,          -- Full article text as markdown
   created_at      TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(book, article_number)
+  UNIQUE(book_id, article_number)
 );
 
 -- ─── Word classifications (pre-computed at seed time) ────────────────────────
