@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -193,7 +194,18 @@ body {
 </head>
 <body>
 
-<div class="login-overlay" id="loginOverlay">
+<div class="login-overlay" id="supaOverlay">
+  <div class="login-card">
+    <div class="login-logo">Lex <span>Memoria</span></div>
+    <div class="login-sub">Sign in to your account</div>
+    <input class="login-field" id="loginEmail" type="email" placeholder="Email" autocomplete="email">
+    <input class="login-field" id="loginPass" type="password" placeholder="Password" autocomplete="current-password">
+    <button class="login-btn" id="loginBtn" onclick="supaLogin()">Sign In</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<div class="login-overlay hidden" id="adminOverlay">
   <div class="login-card">
     <div class="login-logo">Lex <span>Memoria</span></div>
     <div class="login-sub">Admin — Article Manager</div>
@@ -209,7 +221,7 @@ body {
   <button class="upload-btn-top" onclick="document.getElementById('uploadModal').classList.toggle('hidden')">
     <i class="ti ti-file-upload"></i> Open Manager
   </button>
-  <button class="upload-btn-top" onclick="adminLogout()">
+  <button class="upload-btn-top" onclick="fullLogout()">
     <i class="ti ti-logout"></i>
   </button>
 </div>
@@ -306,6 +318,7 @@ body {
 </div>
 
 <script>
+let supabaseClient = null
 let authToken = null
 let books = []
 let currentBookId = null
@@ -313,6 +326,7 @@ let articles = []
 let parsedArticles = []
 let editingArticleId = null
 
+// ─── Auth helpers ────────────────────────────
 async function api(path, options = {}) {
   const headers = { 'Content-Type': 'application/json' }
   if (authToken) headers['Authorization'] = 'Bearer ' + authToken
@@ -330,23 +344,68 @@ function escapeHtml(str) {
   return div.innerHTML
 }
 
-// ─── Admin Auth ──────────────────────────────
+// ─── Init ────────────────────────────────────
 async function init() {
-  const authed = localStorage.getItem('csv_admin')
-  if (authed === '1') {
-    authToken = ''
-    document.getElementById('loginOverlay').classList.add('hidden')
-    document.getElementById('topbar').style.display = 'flex'
-    document.getElementById('uploadModal').style.display = 'block'
-    await fetchBooks()
-    if (books.length > 0) { currentBookId = books[0].id; renderBookSelect() }
-    switchUploadTab('csv', document.querySelector('.upload-tab'))
-    renderUploadBookSelect()
-    renderAddBookSelect()
+  try {
+    const config = await api('/api/config')
+    supabaseClient = supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
+      auth: { persistSession: false },
+    })
+    // Try restoring session from cookie
+    let session = null
+    try { const r = await supabaseClient.auth.getSession(); session = r.data.session } catch(e) {}
+    if (!session) {
+      const token = document.cookie.match(/(?:^|;\s*)lex_token=([^;]*)/)
+      if (token) {
+        try { await supabaseClient.auth.setSession({ access_token: token[1], refresh_token: '' }); session = (await supabaseClient.auth.getSession()).data.session } catch(e) {}
+      }
+    }
+    if (session) {
+      authToken = session.access_token
+      const adminAuthed = localStorage.getItem('csv_admin') === '1'
+      if (adminAuthed) {
+        showManager()
+      } else {
+        document.getElementById('supaOverlay').classList.add('hidden')
+        document.getElementById('adminOverlay').classList.remove('hidden')
+        document.getElementById('adminPass').focus()
+      }
+    } else {
+      document.getElementById('supaOverlay').classList.remove('hidden')
+      document.getElementById('loginEmail').focus()
+    }
+  } catch (e) {
+    console.error('Init error:', e)
   }
 }
 init()
 
+// ─── Supabase Auth ──────────────────────────
+async function supaLogin() {
+  const email = document.getElementById('loginEmail').value.trim()
+  const password = document.getElementById('loginPass').value
+  const btn = document.getElementById('loginBtn')
+  const errorEl = document.getElementById('loginError')
+
+  if (!supabaseClient) { errorEl.textContent = 'Still loading…'; return }
+  if (!email || !password) { errorEl.textContent = 'Please enter email and password.'; return }
+
+  btn.disabled = true; btn.textContent = 'Signing in…'; errorEl.textContent = ''
+  try {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password })
+    if (error) throw error
+    authToken = data.session.access_token
+    try { document.cookie = 'lex_token=' + authToken + '; path=/; max-age=604800; SameSite=Lax' } catch(e) {}
+    document.getElementById('supaOverlay').classList.add('hidden')
+    document.getElementById('adminOverlay').classList.remove('hidden')
+    document.getElementById('adminPass').focus()
+  } catch (e) {
+    errorEl.textContent = e.message || 'Sign in failed.'
+  }
+  btn.disabled = false; btn.textContent = 'Sign In'
+}
+
+// ─── Admin Auth ──────────────────────────────
 async function adminLogin() {
   const pass = document.getElementById('adminPass').value
   const btn = document.getElementById('adminLoginBtn')
@@ -356,22 +415,29 @@ async function adminLogin() {
   try {
     await api('/api/admin/login', { method: 'POST', body: JSON.stringify({ password: pass }) })
     localStorage.setItem('csv_admin', '1')
-    authToken = ''
-    document.getElementById('loginOverlay').classList.add('hidden')
-    document.getElementById('topbar').style.display = 'flex'
-    document.getElementById('uploadModal').style.display = 'block'
-    await fetchBooks()
-    if (books.length > 0) { currentBookId = books[0].id; renderBookSelect() }
-    switchUploadTab('csv', document.querySelector('.upload-tab'))
-    renderUploadBookSelect()
-    renderAddBookSelect()
+    showManager()
   } catch (e) {
     errorEl.textContent = e.message || 'Wrong password'
   }
   btn.disabled = false; btn.textContent = 'Sign In'
 }
 
-function adminLogout() {
+function showManager() {
+  document.getElementById('adminOverlay').classList.add('hidden')
+  document.getElementById('topbar').style.display = 'flex'
+  document.getElementById('uploadModal').classList.remove('hidden')
+  fetchBooks().then(() => {
+    if (books.length > 0) { currentBookId = books[0].id; renderBookSelect() }
+    switchUploadTab('csv', document.querySelector('.upload-tab'))
+    renderUploadBookSelect()
+    renderAddBookSelect()
+  })
+}
+
+function fullLogout() {
+  if (supabaseClient) supabaseClient.auth.signOut()
+  authToken = null
+  try { document.cookie = 'lex_token=; path=/; max-age=0; SameSite=Lax' } catch(e) {}
   localStorage.removeItem('csv_admin')
   location.reload()
 }
