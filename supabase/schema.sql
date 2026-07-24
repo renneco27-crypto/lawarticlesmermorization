@@ -85,6 +85,17 @@ CREATE TABLE lex_weak_spots (
   last_wrong_at   TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- ─── Schema Permissions ───────────────────────────────────────────────────────
+-- PostgREST executes API calls as the anon/authenticated role.
+-- Without USAGE on public schema, PostgREST returns 500 before RLS runs.
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO anon, authenticated, service_role;
+
 -- ─── Row Level Security ───────────────────────────────────────────────────────
 ALTER TABLE lex_books              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lex_articles           ENABLE ROW LEVEL SECURITY;
@@ -110,7 +121,10 @@ CREATE POLICY "word_classifications_public_read" ON lex_word_classifications FOR
 CREATE POLICY "word_classifications_auth_insert" ON lex_word_classifications FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
 -- Users only see their own data
+-- Note: FOR ALL covers SELECT/UPDATE/DELETE but NOT INSERT.
+-- INSERT requires a separate WITH CHECK policy; without it new signups crash.
 CREATE POLICY "own_profile"           ON lex_profiles         FOR ALL USING (auth.uid() = id);
+CREATE POLICY "own_profile_insert"    ON lex_profiles         FOR INSERT WITH CHECK (auth.uid() = id);
 CREATE POLICY "own_progress"          ON lex_article_progress FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "own_sessions"          ON lex_sessions         FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "own_weak_spots"        ON lex_weak_spots        FOR ALL USING (auth.uid() = user_id);

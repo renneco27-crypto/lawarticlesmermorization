@@ -107,6 +107,15 @@ C:\Users\corte\Desktop\lex memoria\
 
 ---
 
+## Session Log — 2026-07-25
+
+### Fix: Schema permissions + INSERT policy for lex_profiles
+**Problem:** Two Supabase roadblocks after schema deploy:
+1. `permission denied for schema public` — PostgREST executes as `anon`/`authenticated` roles; without explicit `USAGE` on `public` schema, Postgres returns 500 before RLS even runs.
+2. Profile creation blocking logins — `CREATE POLICY "own_profile" ON lex_profiles FOR ALL USING (auth.uid() = id)` covers SELECT/UPDATE/DELETE but PostgreSQL requires a `WITH CHECK` clause for INSERT. Without a separate INSERT policy, the profile trigger crashes on signup.
+
+**Fix:** Added `GRANT USAGE/ALL ON SCHEMA public` for `anon`, `authenticated`, `service_role` with `ALTER DEFAULT PRIVILEGES` so future tables auto-inherit. Added explicit `CREATE POLICY "own_profile_insert" ON lex_profiles FOR INSERT WITH CHECK (auth.uid() = id)`.
+
 ## Session Log — 2026-07-24
 
 ### Change: Q&A bypass on ≥80% confidence
