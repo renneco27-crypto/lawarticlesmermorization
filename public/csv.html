@@ -172,7 +172,7 @@ body {
 .field-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
 .field-input, .field-textarea { background: var(--bg); border: 1.5px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; font-family: 'Inter', sans-serif; font-size: 13px; color: var(--text); outline: none; transition: border-color 0.12s; }
 .field-input:focus, .field-textarea:focus { border-color: var(--green); }
-.field-textarea { min-height: 120px; resize: vertical; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.6; }
+.field-textarea { min-height: 120px; resize: vertical; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.6; width: 100%; }
 .field-row-inline { display: flex; gap: 10px; }
 .field-row-inline .field-row { flex: 1; }
 .form-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
@@ -221,8 +221,8 @@ body {
   <button class="upload-btn-top" onclick="document.getElementById('uploadModal').classList.toggle('hidden')">
     <i class="ti ti-file-upload"></i> Open Manager
   </button>
-  <button class="upload-btn-top" onclick="fullLogout()">
-    <i class="ti ti-logout"></i>
+  <button class="upload-btn-top" onclick="window.location.href='https://lawrence.cloud-ip.cc/'">
+    <i class="ti ti-external-link"></i> lawrence.cloud-ip.cc
   </button>
 </div>
 
@@ -235,6 +235,7 @@ body {
     <button class="upload-tab active" onclick="switchUploadTab('csv', this)">📄 CSV</button>
     <button class="upload-tab" onclick="switchUploadTab('add', this)">➕ Add</button>
     <button class="upload-tab" onclick="switchUploadTab('manage', this)">📋 Manage</button>
+    <button class="upload-tab" onclick="switchUploadTab('generate', this)">🛠️ Generate</button>
   </div>
   <div class="upload-body">
     <div id="uploadPaneCsv" class="upload-pane">
@@ -310,6 +311,36 @@ body {
       </div>
       <div id="uploadMgrResult" class="upload-result" style="display:none"></div>
     </div>
+    <div id="uploadPaneGenerate" class="upload-pane hidden">
+      <div class="upload-book-row">
+        <label class="field-label" style="margin-bottom:0;">Upload to book:</label>
+        <select class="upload-book-select" id="genBookSelect" onchange="currentBookId=this.value;renderBookSelect()"></select>
+        <button class="btn-sm" onclick="createBookFromUpload()">+ New</button>
+      </div>
+      <textarea class="field-textarea" id="genInput" style="min-height:160px;" placeholder="Paste statute/constitution text here..."></textarea>
+      <div style="display:flex;gap:8px;margin:8px 0;flex-wrap:wrap;align-items:center;">
+        <label style="font-size:12px;color:var(--text-dim);">Start # <input class="field-input" id="genStartNum" type="number" min="1" value="1" style="width:60px;"></label>
+        <label style="font-size:12px;color:var(--text-dim);">Chapter <input class="field-input" id="genChapter" value="Ch. 1" style="width:80px;"></label>
+        <button class="btn-primary" onclick="generateArticles()">Parse</button>
+        <button class="btn-sm" onclick="document.getElementById('genInput').value='';document.getElementById('genPreview').style.display='none';document.getElementById('genUploadBtn').disabled=true;document.getElementById('genDownloadBtn').disabled=true">Clear</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin:6px 0;font-size:12px;color:var(--text-dim);align-items:center;">
+        <label><input type="checkbox" id="genFixOcr" checked> Fix OCR</label>
+        <label><input type="checkbox" id="genJoinBreaks" checked> Rejoin</label>
+        <label><input type="checkbox" id="genStripNoise" checked> Strip noise</label>
+        <label><input type="checkbox" id="genDedupe" checked> Dedupe</label>
+        <label>Custom markers: <input class="field-input" id="genNoisePatterns" oninput="saveGenPatterns()" placeholder="Gong gong:, [Speaker]" style="width:180px;font-size:11px;"></label>
+      </div>
+      <div class="upload-preview" id="genPreview" style="display:none">
+        <table><thead><tr><th>#</th><th>Art.</th><th>Title</th><th>Chapter</th></tr></thead>
+        <tbody id="genPreviewBody"></tbody></table>
+      </div>
+      <div id="genResult" class="upload-result" style="display:none"></div>
+      <div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn-primary" id="genUploadBtn" onclick="uploadGeneratedArticles()" disabled>Upload to Book</button>
+        <button class="btn-sm" id="genDownloadBtn" onclick="downloadGeneratedCsv()" disabled>Download CSV</button>
+      </div>
+    </div>
   </div>
   <div class="upload-footer">
     <button class="btn-cancel" onclick="document.getElementById('uploadModal').classList.add('hidden')">Close</button>
@@ -325,6 +356,7 @@ let currentBookId = null
 let articles = []
 let parsedArticles = []
 let editingArticleId = null
+let generatedArticles = []
 
 // ─── Auth helpers ────────────────────────────
 async function api(path, options = {}) {
@@ -368,9 +400,10 @@ async function init() {
       } else {
         document.getElementById('supaOverlay').classList.add('hidden')
         document.getElementById('adminOverlay').classList.remove('hidden')
-        const savedPass = localStorage.getItem('saved_admin_pass')
-        if (savedPass) { document.getElementById('adminPass').value = savedPass }
-        document.getElementById('adminPass').focus()
+        const cookiePass = (document.cookie.match(/(?:^|;\s*)admin_pass=([^;]*)/)||[])[1]
+        const savedPass = cookiePass ? decodeURIComponent(cookiePass) : localStorage.getItem('saved_admin_pass')
+        if (savedPass) { document.getElementById('adminPass').value = savedPass; adminLogin() }
+        else document.getElementById('adminPass').focus()
       }
     } else {
       document.getElementById('supaOverlay').classList.remove('hidden')
@@ -409,7 +442,13 @@ async function supaLogin() {
 
 // ─── Admin Auth ──────────────────────────────
 function saveAdminPass() {
-  localStorage.setItem('saved_admin_pass', document.getElementById('adminPass').value)
+  const v = document.getElementById('adminPass').value
+  localStorage.setItem('saved_admin_pass', v)
+  document.cookie = 'admin_pass=' + encodeURIComponent(v) + '; path=/; max-age=31536000; SameSite=Lax'
+}
+
+function saveGenPatterns() {
+  document.cookie = 'gen_noise_patterns=' + encodeURIComponent(document.getElementById('genNoisePatterns').value) + '; path=/; max-age=31536000; SameSite=Lax'
 }
 
 async function adminLogin() {
@@ -432,11 +471,14 @@ function showManager() {
   document.getElementById('adminOverlay').classList.add('hidden')
   document.getElementById('topbar').style.display = 'flex'
   document.getElementById('uploadModal').classList.remove('hidden')
+  const p = (document.cookie.match(/(?:^|;\s*)gen_noise_patterns=([^;]*)/)||[])[1]
+  if (p) document.getElementById('genNoisePatterns').value = decodeURIComponent(p)
   fetchBooks().then(() => {
     if (books.length > 0) { currentBookId = books[0].id; renderBookSelect() }
     switchUploadTab('csv', document.querySelector('.upload-tab'))
     renderUploadBookSelect()
     renderAddBookSelect()
+    renderGenBookSelect()
   })
 }
 
@@ -456,6 +498,7 @@ function switchUploadTab(tab, btn) {
   document.querySelectorAll('.upload-pane').forEach(p => p.classList.add('hidden'))
   document.getElementById('uploadPane' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.remove('hidden')
   if (tab === 'manage') loadManageArticles()
+  if (tab === 'generate') renderGenBookSelect()
 }
 
 // ─── CSV Tab ─────────────────────────────────
@@ -554,6 +597,7 @@ async function confirmUpload() {
     if (result.errors && result.errors.length > 0) showCsvResult(msg + ' ' + result.errors.length + ' error(s): ' + result.errors.map(e => e.reason).join('; '), true)
     else showCsvResult(msg, true)
     await reloadArticles(currentBookId)
+    loadManageArticles()
   } catch (e) { showCsvResult('Upload failed: ' + e.message, false) }
   btn.disabled = false; btn.textContent = 'Upload CSV'
 }
@@ -760,6 +804,164 @@ async function deleteBook(bookId, name) {
       loadManageArticles()
     }
   } catch(e) { console.error('Delete book failed:', e) }
+}
+
+// ─── Generate Tab ────────────────────────────
+function renderGenBookSelect() {
+  const sel = document.getElementById('genBookSelect')
+  if (!sel) return
+  sel.innerHTML = books.map(b => '<option value="' + b.id + '"' + (b.id === currentBookId ? ' selected' : '') + '>' + escapeHtml(b.name) + '</option>').join('')
+}
+
+const ROMAN_MAP = {i:1,ii:2,iii:3,iv:4,v:5,vi:6,vii:7,viii:8,ix:9,x:10,xi:11,xii:12,xiii:13,xiv:14,xv:15,xvi:16,xvii:17,xviii:18,xix:19,xx:20}
+function romanToInt(r){ r = r.toLowerCase(); if (ROMAN_MAP[r] !== undefined) return ROMAN_MAP[r]; const n = parseInt(r,10); return isNaN(n) ? r : n }
+
+function fixOcrErrors(text){
+  const fixes = [
+    [/\barchipelag\b/g,'archipelago'],
+    [/\bpers person\b/gi,'person'],
+    [/\bar civil\b/g,'or civil'],
+    [/\bouth\b/g,'youth'],
+    [/\bheir\b(?=\s+physical)/g,'their'],
+    [/\bpar of\b/g,'part of'],
+    [/\bembrace therein\b/g,'embraced therein'],
+    [/[ \t]{2,}/g,' '],
+    [/ ,/g,','],
+    [/ \./g,'.'],
+    [/[“”]/g,'"'],
+    [/[‘’]/g,"'"],
+  ]
+  let out = text
+  for (const [pat, rep] of fixes) out = out.replace(pat, rep)
+  return out
+}
+
+function safeRejoin(raw){
+  const lines = raw.split(/\r?\n/)
+  const out = []
+  const startsNewUnit = (l) => /^(article|section|sec\.|chapter|\(\d+\)|\(\w\)|\d+\.\s)/i.test(l.trim())
+  for (let i = 0; i < lines.length; i++){
+    let line = lines[i].trim()
+    if (line === '') { out.push(''); continue }
+    while (
+      out.length && out[out.length-1] !== '' &&
+      !/[.!?:]["')\]]?$/.test(out[out.length-1]) &&
+      !startsNewUnit(line) &&
+      /^[a-z(]/.test(line)
+    ){
+      out[out.length-1] = out[out.length-1] + ' ' + line
+      i++
+      if (i >= lines.length) break
+      line = lines[i].trim()
+      if (line === '') break
+    }
+    if (i < lines.length) out.push(line)
+  }
+  return out.join('\n')
+}
+
+function stripNoiseMarkers(t, extras){
+  let out = t.replace(/^\s*>?\s*[A-Za-z][A-Za-z ]{0,24}:\s*/gm,'').replace(/>\s*[A-Za-z][A-Za-z ]{0,24}:\s*/g,' ')
+  if(extras&&extras.length) for(const p of extras){ const e=p.trim(); if(e) out=out.replace(new RegExp('>?\\s*'+e.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\s*','gi'),' ') }
+  return out.replace(/[ \t]{2,}/g,' ').replace(/\n{3,}/g,'\n\n')
+}
+
+function dedupeRepeatedBlocks(text, minW, maxGap){
+  minW=minW||18; maxGap=maxGap||400
+  const words = text.split(/(\s+)/), tok = []; words.forEach((w,i)=>{if(!/^\s*$/.test(w))tok.push(i)})
+  const norm = w=>w.toLowerCase().replace(/[^\w']/g,''), seen = new Map(), drop = new Set()
+  for(let t=0;t+minW<=tok.length;t++){
+    if(drop.has(tok[t])) continue
+    const key = Array.from({length:minW},(_,k)=>norm(words[tok[t+k]])).join(' ')
+    if(!key.trim()) continue
+    if(seen.has(key)&&(t-seen.get(key))<=maxGap){
+      let extra=0; while(t+minW+extra<tok.length&&seen.get(key)+minW+extra<tok.length&&norm(words[tok[t+minW+extra]])===norm(words[tok[seen.get(key)+minW+extra]])) extra++
+      for(let k=0;k<minW+extra;k++) drop.add(tok[t+k]); t+=minW+extra-1; continue
+    }
+    seen.set(key,t)
+  }
+  let out=''; for(let i=0;i<words.length;i++){if(!drop.has(i))out+=words[i]}
+  return out.replace(/[ \t]+\n/g,'\n').replace(/\n[ \t]+/g,'\n').replace(/[ \t]{2,}/g,' ').replace(/\n{3,}/g,'\n\n').trim()
+}
+
+function parseArticles(text, chapterLabel, doFixOcr, doJoin, doStripNoise, extraPatterns, doDedupe){
+  let src = text.replace(/\r\n/g,'\n')
+  if (doStripNoise) src = stripNoiseMarkers(src, extraPatterns)
+  if (doJoin) src = safeRejoin(src)
+  if (doDedupe) src = dedupeRepeatedBlocks(src)
+  if (doFixOcr) src = fixOcrErrors(src)
+  const lines = src.split('\n'), markers = [], regex = /^(ARTICLE|Article)\s+([IVXLCDM]+|\d+)\b\.?\s*(.*)$/
+  for (let i=0;i<lines.length;i++){ const m=lines[i].trim().match(regex); if(m) markers.push({idx:i,roman:m[2],inlineTitle:m[3].trim()}) }
+  if (!markers.length) return { articles:[], warning:'No "Article" headings found. Check the text starts each section with the word ARTICLE.' }
+  const articles = []
+  for (let a=0;a<markers.length;a++){
+    const start=markers[a].idx, end=a+1<markers.length?markers[a+1].idx:lines.length
+    let bodyLines=lines.slice(start+1,end)
+    // Prefer inline title on the ARTICLE line itself (after a dash or --)
+    let title=markers[a].inlineTitle.replace(/^[-–—:]\s*/,'').trim()
+    // If no inline title, look at next non-empty line before first body text
+    if(!title){
+      let i=0; while(i<bodyLines.length&&!bodyLines[i].trim()) i++
+      if(i<bodyLines.length){
+        const candidate=bodyLines[i].trim()
+        const looksLikeSection=/^(section|sec\.)\s/i.test(candidate)
+        const looksLikeBody=candidate.length>70||(/[.]$/.test(candidate)&&candidate.split(' ').length>10)
+        if(!looksLikeSection&&!looksLikeBody&&candidate.length<80){ title=candidate.replace(/[.:]$/,''); bodyLines=bodyLines.slice(i+1) }
+      }
+    }
+    const articleNum = romanToInt(markers[a].roman)
+    const fullTitle = `Article ${markers[a].roman}${title?' - '+title:''}`
+    let body = bodyLines.join('\n').trim()
+    body = body.replace(/\n{2,}/g,'\n')
+    articles.push({ chapter:chapterLabel, article_number:articleNum, title:fullTitle, content_md:body })
+  }
+  return { articles, warning:null }
+}
+
+function articlesToCsv(articles){
+  const esc = v => '"' + String(v).replace(/\r?\n/g,' | ').replace(/"/g,'""').trim() + '"'
+  return ['chapter,article_number,title,content_md', ...articles.map(a=>[esc(a.chapter),a.article_number,esc(a.title),esc(a.content_md)].join(','))].join('\n')
+}
+
+function generateArticles(){
+  const text = document.getElementById('genInput').value
+  const ch = document.getElementById('genChapter').value || 'Ch. 1'
+  const startOffset = (parseInt(document.getElementById('genStartNum').value,10) || 1) - 1
+  const doFixOcr = document.getElementById('genFixOcr').checked
+  const doJoin = document.getElementById('genJoinBreaks').checked
+  const doStripNoise = document.getElementById('genStripNoise').checked
+  const doDedupe = document.getElementById('genDedupe').checked
+  const extraPatterns = document.getElementById('genNoisePatterns').value.split(',').filter(Boolean)
+  if (!text.trim()){ document.getElementById('genResult').textContent='Paste some text first.'; document.getElementById('genResult').className='upload-result err'; document.getElementById('genResult').style.display='block'; return }
+  const {articles,warning} = parseArticles(text, ch, doFixOcr, doJoin, doStripNoise, extraPatterns, doDedupe)
+  if(!articles.length){ document.getElementById('genResult').textContent=warning||'No articles found.'; document.getElementById('genResult').className='upload-result err'; document.getElementById('genResult').style.display='block'; return }
+  // Apply start offset to parsed roman numeral article numbers (e.g. start=5 shifts Article I → 5)
+  if (startOffset !== 0) articles.forEach(a => { if (typeof a.article_number === 'number') a.article_number += startOffset })
+  generatedArticles = articles
+  const tbody=document.getElementById('genPreviewBody'), max=50
+  tbody.innerHTML=articles.slice(0,max).map((r,i)=>`<tr><td class="num">${i+1}</td><td class="num">${r.article_number}</td><td>${escapeHtml(r.title)}</td><td>${escapeHtml(r.chapter)}</td></tr>`).join('')
+  if(articles.length>max) tbody.innerHTML+=`<tr><td colspan="4" style="color:var(--text-muted);font-style:italic">… and ${articles.length-max} more</td></tr>`
+  document.getElementById('genPreview').style.display='block'
+  document.getElementById('genUploadBtn').disabled=false; document.getElementById('genDownloadBtn').disabled=false
+  document.getElementById('genResult').textContent=`Parsed ${articles.length} article(s).`; document.getElementById('genResult').className='upload-result ok'; document.getElementById('genResult').style.display='block'
+}
+
+function downloadGeneratedCsv(){
+  if(!generatedArticles.length) return
+  const blob=new Blob([articlesToCsv(generatedArticles)],{type:'text/csv;charset=utf-8;'}), url=URL.createObjectURL(blob)
+  const a=document.createElement('a'); a.href=url; a.download='generated_articles.csv'; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url)
+}
+
+async function uploadGeneratedArticles(){
+  if(!generatedArticles.length) return
+  if(!currentBookId){ document.getElementById('genResult').textContent='No book selected.'; document.getElementById('genResult').className='upload-result err'; document.getElementById('genResult').style.display='block'; return }
+  const btn=document.getElementById('genUploadBtn'); btn.disabled=true; btn.textContent='Uploading…'
+  try{
+    const r=await api('/api/articles/upload',{method:'POST',body:JSON.stringify({bookId:currentBookId,articles:generatedArticles})})
+    document.getElementById('genResult').textContent=r.inserted+' article(s) uploaded.'+(r.errors?.length?' '+r.errors.length+' error(s).':'')+(r.dupesStripped?' ('+r.dupesStripped+' dupes stripped)':'')
+    document.getElementById('genResult').className='upload-result ok'; document.getElementById('genResult').style.display='block'; loadManageArticles()
+  }catch(e){ document.getElementById('genResult').textContent='Upload failed: '+e.message; document.getElementById('genResult').className='upload-result err'; document.getElementById('genResult').style.display='block' }
+  btn.disabled=false; btn.textContent='Upload to Book'
 }
 </script>
 </body>
