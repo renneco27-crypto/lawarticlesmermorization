@@ -70,10 +70,22 @@ C:\Users\corte\Desktop\lex memoria\
 
 ---
 
-### [AGENTS.md]
- Keywords [memory, directives, gitignore, repo-map, format, debug, modularity]
+### [supabase/schema.sql]
+ Keywords [schema, tables, lex-prefix, rls, trigger]
 
- Description: Central memory directive — 8 sections governing opencode behavior:
+ Tables
+   `lex_books` — books/groups of articles (name, created_at)
+   `lex_articles` — articles with book_id FK, book/chapter/article_number/content_md
+   `lex_word_classifications` — pre-computed word types per article position
+   `lex_profiles` — user profiles extending auth.users (xp, streak, hearts)
+   `lex_article_progress` — per-user progress per article (status, score, attempts)
+   `lex_sessions` — practice attempt records with transcript/scores/xp
+   `lex_weak_spots` — tracks per-user frequently missed articles by wrong_count
+
+### [AGENTS.md]
+ Keywords [memory, directives, gitignore, repo-map, format, debug, modularity, 8b, 8c, 8d, 9, 10, 11, 12]
+
+ Description: Central memory directive — 12 sections governing opencode behavior:
    §1 Pre-Task Recall — read memory/functions.md before grep
    §2 Post-Task Auto-Save — append solutions after every session
    §3 Respect .gitignore — never scan excluded paths

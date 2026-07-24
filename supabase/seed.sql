@@ -2,7 +2,7 @@
 -- Philippine Civil Code Book 1, Articles 1–20
 -- Run AFTER schema.sql
 
-INSERT INTO articles (book, chapter, article_number, title, content_md) VALUES
+INSERT INTO lex_articles (book, chapter, article_number, title, content_md) VALUES
 
 -- Chapter 1: Effect and Application of Laws (Articles 1–18)
 (
