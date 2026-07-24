@@ -109,6 +109,14 @@ C:\Users\corte\Desktop\lex memoria\
 
 ## Session Log — 2026-07-25
 
+### Feat: Admin CSV page at /csv.html
+**Branch:** `feature/csv-admin` (couldn't use `testing/csv` — existing `testing` branch conflicted)
+**Files:**
+- `public/csv.html` — standalone admin page with password login + full article manager (CSV upload, Add, Manage tabs). Auth persists via `localStorage` — no re-typing password after first login.
+- `app/api/admin/login/route.ts` — verifies password against `lex_admin` table using `crypto.scryptSync` with stored salt
+- `supabase/schema.sql` — added `lex_admin` table with pre-hashed password and salt for `02272007Law!`
+- `public/index.html` — removed CSV upload button (moved to admin page)
+
 ### Fix: Schema permissions + INSERT policy for lex_profiles
 **Problem:** Two Supabase roadblocks after schema deploy:
 1. `permission denied for schema public` — PostgREST executes as `anon`/`authenticated` roles; without explicit `USAGE` on `public` schema, Postgres returns 500 before RLS even runs.
