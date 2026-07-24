@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lex Memoria — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --green: #58cc02; --green-dark: #4aaa02; --green-bg: #d7ffb8;
+  --blue: #1cb0f6; --blue-bg: #ddf4ff;
+  --red: #ff4b4b; --red-bg: #ffdfe0;
+  --orange: #ff9600; --orange-bg: #feefe3;
+  --purple: #ce82ff; --purple-bg: #f0d9ff;
+  --gold: #ffc800;
+  --bg: #131f24; --surface: #1c2d35; --surface2: #243540;
+  --surface3: #2e4250; --border: #2e4250;
+  --text: #e8f4f0; --text-dim: #8ba7b2; --text-muted: #526b78;
+  --radius-sm: 8px; --radius: 12px; --radius-lg: 18px; --radius-xl: 24px;
+}
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg); color: var(--text);
+  min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 16px;
+}
+.login-overlay {
+  position: fixed; inset: 0; z-index: 999;
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+}
+.login-overlay.hidden { display: none; }
+.login-card {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 36px 32px;
+  width: 90%; max-width: 380px;
+  text-align: center;
+}
+.login-logo {
+  font-family: 'Nunito', sans-serif; font-weight: 900;
+  font-size: 28px; color: var(--green); margin-bottom: 4px;
+}
+.login-logo span { color: var(--text); }
+.login-sub {
+  font-size: 13px; color: var(--text-muted); margin-bottom: 24px;
+}
+.login-field {
+  width: 100%;
+  background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 10px 12px;
+  font-family: 'Inter', sans-serif; font-size: 14px;
+  color: var(--text); outline: none; margin-bottom: 12px;
+  transition: border-color 0.12s;
+}
+.login-field:focus { border-color: var(--green); }
+.login-field::placeholder { color: var(--text-muted); }
+.login-btn {
+  width: 100%;
+  font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 15px;
+  padding: 10px; border-radius: 99px; border: none;
+  background: var(--green); color: #fff; cursor: pointer;
+  transition: background 0.12s; margin-top: 4px;
+}
+.login-btn:hover { background: var(--green-dark); }
+.login-btn:disabled { opacity: 0.4; cursor: default; }
+.login-error {
+  font-size: 12px; color: var(--red); margin-top: 10px; min-height: 18px;
+}
+.topbar {
+  width: 100%; max-width: 680px;
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 0 14px;
+}
+.logo {
+  font-family: 'Nunito', sans-serif; font-weight: 900;
+  font-size: 22px; color: var(--green); flex-shrink: 0;
+}
+.logo span { color: var(--text); }
+.upload-btn-top {
+  font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 12px;
+  padding: 6px 13px; border-radius: 99px;
+  border: 1.5px solid var(--border); background: var(--surface2);
+  color: var(--text-dim); cursor: pointer; transition: all 0.15s;
+  display: flex; align-items: center; gap: 5px; white-space: nowrap;
+}
+.upload-btn-top:hover { border-color: var(--blue); color: var(--blue); background: rgba(28,176,246,0.1); }
+.btn-sm {
+  font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 11px;
+  padding: 4px 10px; border-radius: 99px;
+  border: 1.5px solid var(--border); background: transparent;
+  color: var(--text-dim); cursor: pointer; transition: all 0.12s;
+}
+.btn-sm:hover { border-color: var(--blue); color: var(--blue); }
+.btn-primary {
+  font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 13px;
+  padding: 7px 18px; border-radius: 99px; border: none;
+  background: var(--green); color: #fff; cursor: pointer; transition: all 0.12s;
+}
+.btn-primary:hover { background: var(--green-dark); }
+.btn-primary:disabled { opacity: 0.4; cursor: default; }
+.btn-cancel {
+  font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 13px;
+  padding: 7px 16px; border-radius: 99px;
+  border: 1.5px solid var(--border); background: transparent;
+  color: var(--text-dim); cursor: pointer; transition: all 0.12s;
+}
+.btn-cancel:hover { color: var(--text); }
+.btn-danger {
+  font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 11px;
+  padding: 4px 10px; border-radius: 99px;
+  border: 1.5px solid var(--red); background: transparent;
+  color: var(--red); cursor: pointer; transition: all 0.12s;
+}
+.btn-danger:hover { background: rgba(255,75,75,0.1); }
+.upload-modal {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: var(--radius-xl); width: 90%; max-width: 680px;
+  max-height: 85vh; display: flex; flex-direction: column; overflow: hidden;
+}
+.upload-head {
+  padding: 18px 22px 14px;
+  font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 18px;
+  border-bottom: 1.5px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.upload-close {
+  background: none; border: none; color: var(--text-muted);
+  font-size: 22px; cursor: pointer; padding: 0 4px;
+}
+.upload-close:hover { color: var(--text); }
+.upload-tabs {
+  display: flex; border-bottom: 1.5px solid var(--border); background: var(--bg);
+}
+.upload-tab {
+  font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 12px;
+  padding: 10px 16px; border: none; background: transparent;
+  color: var(--text-muted); cursor: pointer;
+  border-bottom: 2.5px solid transparent; transition: all 0.12s;
+  display: flex; align-items: center; gap: 5px;
+}
+.upload-tab:hover { color: var(--text); }
+.upload-tab.active { color: var(--green); border-bottom-color: var(--green); }
+.upload-body { padding: 18px 22px; overflow-y: auto; flex: 1; }
+.upload-pane { display: block; }
+.upload-pane.hidden { display: none; }
+.drop-zone {
+  border: 2px dashed var(--border); border-radius: var(--radius);
+  padding: 36px 20px; text-align: center; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.drop-zone:hover, .drop-zone.dragover { border-color: var(--green); background: rgba(88,204,2,0.04); }
+.drop-zone-icon { font-size: 36px; color: var(--text-muted); margin-bottom: 8px; }
+.drop-zone-text { font-size: 14px; color: var(--text-dim); font-weight: 600; }
+.drop-zone-sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.upload-preview { margin-top: 16px; }
+.upload-preview table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.upload-preview th { text-align: left; color: var(--text-muted); font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 8px; border-bottom: 1.5px solid var(--border); }
+.upload-preview td { padding: 6px 8px; border-bottom: 1px solid var(--surface3); color: var(--text-dim); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.upload-preview td.num { font-family: 'JetBrains Mono', monospace; color: var(--gold); width: 30px; }
+.upload-preview tr:hover td { background: var(--surface2); }
+.upload-footer { padding: 14px 22px; border-top: 1.5px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; align-items: center; }
+.upload-result { margin-top: 12px; padding: 10px 14px; border-radius: var(--radius); font-size: 13px; font-weight: 600; }
+.upload-result.ok { background: rgba(88,204,2,0.1); color: var(--green); }
+.upload-result.err { background: rgba(255,75,75,0.1); color: var(--red); }
+.article-form { display: flex; flex-direction: column; gap: 12px; }
+.field-row { display: flex; flex-direction: column; gap: 4px; }
+.field-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+.field-input, .field-textarea { background: var(--bg); border: 1.5px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; font-family: 'Inter', sans-serif; font-size: 13px; color: var(--text); outline: none; transition: border-color 0.12s; }
+.field-input:focus, .field-textarea:focus { border-color: var(--green); }
+.field-textarea { min-height: 120px; resize: vertical; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.6; }
+.field-row-inline { display: flex; gap: 10px; }
+.field-row-inline .field-row { flex: 1; }
+.form-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+.mgr-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.mgr-count { font-size: 12px; color: var(--text-muted); }
+.mgr-list { display: flex; flex-direction: column; gap: 6px; }
+.mgr-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--surface2); border-radius: var(--radius-sm); border: 1.5px solid var(--border); transition: border-color 0.12s; }
+.mgr-item:hover { border-color: var(--surface3); }
+.mgr-num { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; color: var(--gold); min-width: 24px; }
+.mgr-info { flex: 1; min-width: 0; }
+.mgr-title { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mgr-sub { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mgr-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.mgr-empty { text-align: center; padding: 32px 0; color: var(--text-muted); font-size: 13px; }
+.upload-book-row { display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap; }
+.upload-book-select { font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface3);color:var(--text);min-width:160px; }
+</style>
+</head>
+<body>
+
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <div class="login-logo">Lex <span>Memoria</span></div>
+    <div class="login-sub">Admin — Article Manager</div>
+    <input class="login-field" id="adminPass" type="password" placeholder="Admin password" autocomplete="off">
+    <button class="login-btn" id="adminLoginBtn" onclick="adminLogin()">Sign In</button>
+    <div class="login-error" id="adminLoginError"></div>
+  </div>
+</div>
+
+<div class="topbar" id="topbar" style="display:none">
+  <div class="logo">Lex <span>Memoria</span></div>
+  <div style="flex:1"></div>
+  <button class="upload-btn-top" onclick="document.getElementById('uploadModal').classList.toggle('hidden')">
+    <i class="ti ti-file-upload"></i> Open Manager
+  </button>
+  <button class="upload-btn-top" onclick="adminLogout()">
+    <i class="ti ti-logout"></i>
+  </button>
+</div>
+
+<div id="uploadModal" style="display:none;width:100%;max-width:680px">
+<div class="upload-modal">
+  <div class="upload-head">
+    <span>📄 Article Manager</span>
+  </div>
+  <div class="upload-tabs">
+    <button class="upload-tab active" onclick="switchUploadTab('csv', this)">📄 CSV</button>
+    <button class="upload-tab" onclick="switchUploadTab('add', this)">➕ Add</button>
+    <button class="upload-tab" onclick="switchUploadTab('manage', this)">📋 Manage</button>
+  </div>
+  <div class="upload-body">
+    <div id="uploadPaneCsv" class="upload-pane">
+      <div class="upload-book-row">
+        <label class="field-label" style="margin-bottom:0;">Upload to book:</label>
+        <select class="upload-book-select" id="uploadBookSelect" onchange="currentBookId=this.value;renderBookSelect()"></select>
+        <div class="upload-book-actions" id="uploadBookActions"></div>
+        <button class="btn-sm" onclick="createBookFromUpload()" title="Create new book">+ New</button>
+      </div>
+      <input type="file" id="csvFileInput" accept=".csv,.txt" style="display:none" onchange="handleFile(this)">
+      <div class="drop-zone" id="dropZone"
+        onclick="document.getElementById('csvFileInput').click()"
+        ondragover="handleDragOver(event)"
+        ondragleave="handleDragLeave(event)"
+        ondrop="handleDrop(event)">
+        <div class="drop-zone-icon"><i class="ti ti-file-spreadsheet"></i></div>
+        <div class="drop-zone-text">Drop a .csv or .txt file here, or click to browse</div>
+        <div class="drop-zone-sub">Expected columns: chapter, article_number, title, content_md</div>
+      </div>
+      <div class="upload-preview" id="uploadPreview" style="display:none">
+        <table><thead><tr><th>#</th><th>Art.</th><th>Title</th><th>Chapter</th></tr></thead>
+        <tbody id="previewBody"></tbody></table>
+      </div>
+      <div id="uploadCsvResult" class="upload-result" style="display:none"></div>
+      <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn-primary" id="confirmUploadBtn" onclick="confirmUpload()" disabled>Upload CSV</button>
+      </div>
+    </div>
+    <div id="uploadPaneAdd" class="upload-pane hidden">
+      <form class="article-form" id="articleForm" onsubmit="return false">
+        <div class="field-row-inline">
+          <div class="field-row">
+            <label class="field-label">Book</label>
+            <select class="field-input" id="addBookSelect" onchange="currentBookId=this.value;renderBookSelect()"></select>
+          </div>
+          <div class="field-row">
+            <label class="field-label">Article Number</label>
+            <input class="field-input" id="addNumber" type="number" min="1" placeholder="1">
+          </div>
+        </div>
+        <div class="field-row">
+          <label class="field-label">Chapter</label>
+          <input class="field-input" id="addChapter" placeholder='e.g. "Chapter 1 — Effect and Application of Laws"'>
+        </div>
+        <div class="field-row">
+          <label class="field-label">Title</label>
+          <input class="field-input" id="addTitle" placeholder='e.g. "Article 1"'>
+        </div>
+        <div class="field-row">
+          <label class="field-label">Content (Markdown)</label>
+          <textarea class="field-textarea" id="addContent" placeholder="Full article text..."></textarea>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn-cancel" onclick="clearForm()">Clear</button>
+          <button type="button" class="btn-primary" id="addArticleBtn" onclick="submitArticle()">Add Article</button>
+        </div>
+      </form>
+      <div id="uploadAddResult" class="upload-result" style="display:none"></div>
+    </div>
+    <div id="uploadPaneManage" class="upload-pane hidden">
+      <div class="mgr-section" style="margin-bottom:16px;">
+        <div class="mgr-header" style="margin-bottom:8px;">
+          <span style="font-weight:700;font-size:13px;">Books</span>
+        </div>
+        <div id="mgrBookList" style="max-height:150px;overflow-y:auto;"></div>
+      </div>
+      <div class="mgr-section">
+        <div class="mgr-header">
+          <span class="mgr-count" id="mgrCount">Loading articles…</span>
+          <button class="btn-sm" onclick="loadManageArticles()">↻ Refresh</button>
+        </div>
+        <div class="mgr-list" id="mgrList"></div>
+      </div>
+      <div id="uploadMgrResult" class="upload-result" style="display:none"></div>
+    </div>
+  </div>
+  <div class="upload-footer">
+    <button class="btn-cancel" onclick="document.getElementById('uploadModal').classList.add('hidden')">Close</button>
+  </div>
+</div>
+</div>
+
+<script>
+let authToken = null
+let books = []
+let currentBookId = null
+let articles = []
+let parsedArticles = []
+let editingArticleId = null
+
+async function api(path, options = {}) {
+  const headers = { 'Content-Type': 'application/json' }
+  if (authToken) headers['Authorization'] = 'Bearer ' + authToken
+  const res = await fetch(path, { ...options, cache: 'no-cache', headers: { ...headers, ...options.headers } })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.error || 'API error')
+  }
+  return res.json()
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div')
+  div.textContent = str
+  return div.innerHTML
+}
+
+// ─── Admin Auth ──────────────────────────────
+async function init() {
+  const authed = localStorage.getItem('csv_admin')
+  if (authed === '1') {
+    authToken = ''
+    document.getElementById('loginOverlay').classList.add('hidden')
+    document.getElementById('topbar').style.display = 'flex'
+    document.getElementById('uploadModal').style.display = 'block'
+    await fetchBooks()
+    if (books.length > 0) { currentBookId = books[0].id; renderBookSelect() }
+    switchUploadTab('csv', document.querySelector('.upload-tab'))
+    renderUploadBookSelect()
+    renderAddBookSelect()
+  }
+}
+init()
+
+async function adminLogin() {
+  const pass = document.getElementById('adminPass').value
+  const btn = document.getElementById('adminLoginBtn')
+  const errorEl = document.getElementById('adminLoginError')
+  if (!pass) { errorEl.textContent = 'Enter password'; return }
+  btn.disabled = true; btn.textContent = 'Signing in…'; errorEl.textContent = ''
+  try {
+    await api('/api/admin/login', { method: 'POST', body: JSON.stringify({ password: pass }) })
+    localStorage.setItem('csv_admin', '1')
+    authToken = ''
+    document.getElementById('loginOverlay').classList.add('hidden')
+    document.getElementById('topbar').style.display = 'flex'
+    document.getElementById('uploadModal').style.display = 'block'
+    await fetchBooks()
+    if (books.length > 0) { currentBookId = books[0].id; renderBookSelect() }
+    switchUploadTab('csv', document.querySelector('.upload-tab'))
+    renderUploadBookSelect()
+    renderAddBookSelect()
+  } catch (e) {
+    errorEl.textContent = e.message || 'Wrong password'
+  }
+  btn.disabled = false; btn.textContent = 'Sign In'
+}
+
+function adminLogout() {
+  localStorage.removeItem('csv_admin')
+  location.reload()
+}
+
+// ─── Upload Tabs ─────────────────────────────
+function switchUploadTab(tab, btn) {
+  document.querySelectorAll('.upload-tab').forEach(t => t.classList.remove('active'))
+  btn.classList.add('active')
+  document.querySelectorAll('.upload-pane').forEach(p => p.classList.add('hidden'))
+  document.getElementById('uploadPane' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.remove('hidden')
+  if (tab === 'manage') loadManageArticles()
+}
+
+// ─── CSV Tab ─────────────────────────────────
+function handleFile(input) {
+  const file = input.files[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = function(e) { parseCSV(e.target.result) }
+  reader.readAsText(file)
+  input.value = ''
+}
+
+function handleDragOver(e) { e.preventDefault(); e.stopPropagation(); document.getElementById('dropZone').classList.add('dragover') }
+function handleDragLeave(e) { e.preventDefault(); e.stopPropagation(); document.getElementById('dropZone').classList.remove('dragover') }
+
+function handleDrop(e) {
+  e.preventDefault(); e.stopPropagation()
+  document.getElementById('dropZone').classList.remove('dragover')
+  const files = e.dataTransfer.files
+  if (files.length > 0 && files[0].name.match(/\.(csv|txt)$/i)) {
+    const reader = new FileReader()
+    reader.onload = function(ev) { parseCSV(ev.target.result) }
+    reader.readAsText(files[0])
+  } else {
+    showCsvResult('Please drop a .csv or .txt file.', false)
+  }
+}
+
+function parseCSV(text) {
+  text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const rows = []
+  let i = 0, isFirstRow = true, header = null, colMap = {}
+  while (i < text.length) {
+    if (text[i] === '\n') { i++; continue }
+    const cells = []
+    while (i < text.length && text[i] !== '\n') {
+      let cell = ''
+      if (text[i] === '"') {
+        i++
+        while (i < text.length) {
+          if (text[i] === '"') {
+            if (i + 1 < text.length && text[i + 1] === '"') { cell += '"'; i += 2 }
+            else { i++; break }
+          } else { cell += text[i++] }
+        }
+      } else {
+        while (i < text.length && text[i] !== ',' && text[i] !== '\n') { cell += text[i++] }
+      }
+      cells.push(cell.trim())
+      if (i < text.length && text[i] === ',') i++
+    }
+    if (i < text.length && text[i] === '\n') i++
+    if (cells.every(c => c === '')) continue
+    if (isFirstRow) {
+      isFirstRow = false; header = cells
+      header.forEach((h, idx) => colMap[h.toLowerCase().trim()] = idx)
+      const required = ['chapter', 'article_number', 'title', 'content_md']
+      const missing = required.filter(r => !(r in colMap))
+      if (missing.length > 0) { showCsvResult('Missing columns: ' + missing.join(', ') + '. Required: ' + required.join(', '), false); return }
+      continue
+    }
+    const get = (col) => (cells[colMap[col]] || '').trim().replace(/\\n/g, '\n')
+    const artNum = parseInt(get('article_number'), 10)
+    rows.push({ chapter: get('chapter'), article_number: isNaN(artNum) ? 0 : artNum, title: get('title'), content_md: get('content_md') })
+  }
+  if (rows.length === 0) { showCsvResult('CSV must have a header row and at least one data row.', false); return }
+  parsedArticles = rows
+  renderPreview(rows)
+}
+
+function renderPreview(rows) {
+  const valid = rows.filter(r => r.article_number > 0 && r.title && r.content_md)
+  const tbody = document.getElementById('previewBody')
+  tbody.innerHTML = valid.slice(0, 50).map((r, i) =>
+    `<tr><td class="num">${i + 1}</td><td class="num">${r.article_number}</td><td>${escapeHtml(r.title)}</td><td>${escapeHtml(r.chapter)}</td></tr>`
+  ).join('')
+  if (valid.length > 50) tbody.innerHTML += `<tr><td colspan="4" style="color:var(--text-muted);font-style:italic">… and ${rows.length - 50} more</td></tr>`
+  document.getElementById('uploadPreview').style.display = 'block'
+  document.getElementById('confirmUploadBtn').disabled = valid.length === 0
+}
+
+function showCsvResult(msg, ok) {
+  const el = document.getElementById('uploadCsvResult')
+  el.textContent = msg; el.className = 'upload-result ' + (ok ? 'ok' : 'err'); el.style.display = 'block'
+}
+
+async function confirmUpload() {
+  const valid = parsedArticles.filter(r => r.article_number > 0 && r.title && r.content_md)
+  if (valid.length === 0) return
+  if (!currentBookId) { showCsvResult('No book selected.', false); return }
+  const btn = document.getElementById('confirmUploadBtn')
+  btn.disabled = true; btn.textContent = 'Uploading…'
+  try {
+    const result = await api('/api/articles/upload', { method: 'POST', body: JSON.stringify({ bookId: currentBookId, articles: valid }) })
+    const msg = result.inserted + ' article(s) uploaded successfully.'
+    if (result.errors && result.errors.length > 0) showCsvResult(msg + ' ' + result.errors.length + ' error(s): ' + result.errors.map(e => e.reason).join('; '), true)
+    else showCsvResult(msg, true)
+    await reloadArticles(currentBookId)
+  } catch (e) { showCsvResult('Upload failed: ' + e.message, false) }
+  btn.disabled = false; btn.textContent = 'Upload CSV'
+}
+
+// ─── Add Tab ─────────────────────────────────
+function clearForm() {
+  document.getElementById('addBookSelect').value = currentBookId || ''
+  document.getElementById('addChapter').value = ''
+  document.getElementById('addNumber').value = ''
+  document.getElementById('addTitle').value = ''
+  document.getElementById('addContent').value = ''
+  document.getElementById('uploadAddResult').style.display = 'none'
+  editingArticleId = null
+  document.getElementById('addArticleBtn').textContent = 'Add Article'
+}
+
+function fillForm(article) {
+  document.getElementById('addBookSelect').value = article.bookId || currentBookId || ''
+  document.getElementById('addChapter').value = article.chapter || ''
+  document.getElementById('addNumber').value = article.articleNumber || ''
+  document.getElementById('addTitle').value = article.title || ''
+  document.getElementById('addContent').value = article.contentMd || ''
+}
+
+async function submitArticle() {
+  const bookId = document.getElementById('addBookSelect').value
+  const chapter = document.getElementById('addChapter').value.trim()
+  const article_number = parseInt(document.getElementById('addNumber').value, 10)
+  const title = document.getElementById('addTitle').value.trim()
+  const content_md = document.getElementById('addContent').value.trim()
+  if (!bookId || !chapter || !article_number || !title || !content_md) {
+    document.getElementById('uploadAddResult').textContent = 'All fields required.'
+    document.getElementById('uploadAddResult').className = 'upload-result err'
+    document.getElementById('uploadAddResult').style.display = 'block'
+    return
+  }
+  try {
+    if (editingArticleId) {
+      await api('/api/articles/' + editingArticleId, { method: 'PATCH', body: JSON.stringify({ chapter, article_number, title, content_md, book: '' }) })
+    } else {
+      await api('/api/articles/upload', { method: 'POST', body: JSON.stringify({ bookId, articles: [{ chapter, article_number, title, content_md }] }) })
+    }
+    document.getElementById('uploadAddResult').textContent = editingArticleId ? 'Article updated.' : 'Article added.'
+    document.getElementById('uploadAddResult').className = 'upload-result ok'
+    document.getElementById('uploadAddResult').style.display = 'block'
+    clearForm()
+    await reloadArticles(currentBookId)
+  } catch (e) {
+    document.getElementById('uploadAddResult').textContent = 'Failed: ' + e.message
+    document.getElementById('uploadAddResult').className = 'upload-result err'
+    document.getElementById('uploadAddResult').style.display = 'block'
+  }
+}
+
+// ─── Manage Tab ──────────────────────────────
+async function loadManageArticles() {
+  const list = document.getElementById('mgrList')
+  const count = document.getElementById('mgrCount')
+  count.textContent = 'Loading…'; list.innerHTML = ''
+  document.getElementById('uploadMgrResult').style.display = 'none'
+  if (books.length === 0) await fetchBooks()
+  const bookList = document.getElementById('mgrBookList')
+  if (bookList) {
+    bookList.innerHTML = books.map(b => {
+      const artCount = articles.filter(a => a.bookId === b.id).length
+      const isCurrent = b.id === currentBookId
+      return '<div class="mgr-item" style="' + (isCurrent ? 'border-left:3px solid var(--orange);' : '') + '">' +
+        '<div class="mgr-info"><div class="mgr-title">' + escapeHtml(b.name) + '</div><div class="mgr-sub">' + artCount + ' article(s)</div></div>' +
+        '<div class="mgr-actions">' +
+        '<button class="btn-sm" onclick="renameBook(\'' + b.id + '\')">✏️</button>' +
+        '<button class="btn-danger" onclick="deleteBook(\'' + b.id + '\',\'' + escapeHtml(b.name).replace(/'/g, "\\'") + '\')">🗑️</button>' +
+        '</div></div>'
+    }).join('')
+  }
+  try {
+    const url = currentBookId ? '/api/articles?book_id=' + currentBookId : '/api/articles'
+    const data = await api(url)
+    const articleCount = data ? data.length : 0
+    count.textContent = articleCount + ' article(s)'
+    if (articleCount === 0) list.innerHTML = '<div class="mgr-empty">No articles yet. Add one via the Add tab or upload a CSV.</div>'
+    else {
+      list.innerHTML = data.map((a, i) => {
+        const num = a.articleNumber || a.article_number
+        const title = a.title || ''
+        const sub = (a.book || '') + ' / ' + (a.chapter || '')
+        const id = a.id
+        return `<div class="mgr-item"><span class="mgr-num">${num}</span><div class="mgr-info"><div class="mgr-title">${escapeHtml(title)}</div><div class="mgr-sub">${escapeHtml(sub)}</div></div><div class="mgr-actions"><button class="btn-sm" onclick="editArticle('${id}')">✏️ Edit</button><button class="btn-danger" onclick="deleteArticle('${id}', '${escapeHtml(title).replace(/'/g, "\\'")}')">🗑 Delete</button></div></div>`
+      }).join('')
+    }
+  } catch (e) { count.textContent = 'Failed to load'; list.innerHTML = '<div class="mgr-empty">Error loading articles.</div>' }
+}
+
+async function editArticle(id) {
+  try {
+    const article = await api('/api/articles/' + id)
+    fillForm(article); editingArticleId = id
+    document.getElementById('addArticleBtn').textContent = 'Update Article'
+    const tabs = document.querySelectorAll('.upload-tab')
+    switchUploadTab('add', tabs[1])
+  } catch (e) {
+    document.getElementById('uploadMgrResult').textContent = 'Failed to load article: ' + e.message
+    document.getElementById('uploadMgrResult').className = 'upload-result err'
+    document.getElementById('uploadMgrResult').style.display = 'block'
+  }
+}
+
+async function deleteArticle(id, title) {
+  if (!confirm('Delete "' + title + '" permanently?')) return
+  try {
+    await api('/api/articles/' + id, { method: 'DELETE' })
+    document.getElementById('uploadMgrResult').textContent = 'Deleted successfully.'
+    document.getElementById('uploadMgrResult').className = 'upload-result ok'
+    document.getElementById('uploadMgrResult').style.display = 'block'
+    await reloadArticles()
+    loadManageArticles()
+  } catch (e) {
+    document.getElementById('uploadMgrResult').textContent = 'Delete failed: ' + e.message
+    document.getElementById('uploadMgrResult').className = 'upload-result err'
+    document.getElementById('uploadMgrResult').style.display = 'block'
+  }
+}
+
+// ─── Shared ──────────────────────────────────
+async function reloadArticles(bookId) {
+  const bid = bookId || currentBookId
+  const url = bid ? '/api/articles?book_id=' + bid : '/api/articles'
+  try {
+    const data = await api(url)
+    if (data) { articles = data }
+  } catch (e) { console.error('Reload failed:', e) }
+}
+
+async function fetchBooks() {
+  try { const d = await api('/api/books'); books = (d || []).sort(function(a,b){return a.name.localeCompare(b.name)}) } catch(e) { console.error('Fetch books failed:', e) }
+}
+
+function renderBookSelect() {
+  const sel = document.getElementById('bookSelect')
+  if (!sel) return
+  sel.innerHTML = books.map(b => '<option value="' + b.id + '"' + (b.id === currentBookId ? ' selected' : '') + '>' + escapeHtml(b.name) + '</option>').join('')
+}
+
+function renderUploadBookSelect() {
+  const sel = document.getElementById('uploadBookSelect')
+  if (!sel) return
+  sel.innerHTML = books.map(b => '<option value="' + b.id + '"' + (b.id === currentBookId ? ' selected' : '') + '>' + escapeHtml(b.name) + '</option>').join('')
+}
+
+function renderAddBookSelect() {
+  const sel = document.getElementById('addBookSelect')
+  if (!sel) return
+  sel.innerHTML = '<option value="">— Select book —</option>' +
+    books.map(b => '<option value="' + b.id + '"' + (b.id === currentBookId ? ' selected' : '') + '>' + escapeHtml(b.name) + '</option>').join('')
+}
+
+async function switchBook(bookId) {
+  if (bookId === currentBookId) return
+  currentBookId = bookId
+  renderBookSelect()
+  await reloadArticles(currentBookId)
+}
+
+async function createBookFromUpload() {
+  const name = prompt('Enter a name for the new book:')
+  if (!name || !name.trim()) return
+  try {
+    const d = await api('/api/books', { method: 'POST', body: JSON.stringify({ name: name.trim() }) })
+    await fetchBooks()
+    currentBookId = d.id
+    renderBookSelect()
+    renderUploadBookSelect()
+    renderAddBookSelect()
+  } catch(e) { console.error('Create book failed:', e) }
+}
+
+async function renameBook(bookId) {
+  const b = books.find(x => x.id === bookId)
+  if (!b) return
+  const name = prompt('Rename "' + b.name + '" to:', b.name)
+  if (!name || name.trim() === b.name) return
+  try {
+    await api('/api/books/' + bookId, { method: 'PATCH', body: JSON.stringify({ name: name.trim() }) })
+    await fetchBooks()
+    renderBookSelect()
+    if (document.getElementById('uploadBookSelect')) renderUploadBookSelect()
+    if (document.getElementById('addBookSelect')) renderAddBookSelect()
+  } catch(e) { console.error('Rename book failed:', e) }
+}
+
+async function deleteBook(bookId, name) {
+  if (!confirm('Delete "' + name + '" and all its articles?')) return
+  try {
+    await api('/api/books/' + bookId, { method: 'DELETE' })
+    await fetchBooks()
+    if (currentBookId === bookId) currentBookId = books.length > 0 ? books[0].id : null
+    renderBookSelect()
+    renderUploadBookSelect()
+    renderAddBookSelect()
+    if (books.length === 0) {
+      articles = []
+      loadManageArticles()
+    } else {
+      await reloadArticles(currentBookId)
+      loadManageArticles()
+    }
+  } catch(e) { console.error('Delete book failed:', e) }
+}
+</script>
+</body>
+</html>
